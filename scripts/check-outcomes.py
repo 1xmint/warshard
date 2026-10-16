@@ -9,6 +9,8 @@ Each check reports a category and a status:
               record    durable intent the user relies on, such as README requirements (required)
               practice  engineering practice, such as tests present (informational)
               signal    a limited indicator, not behavioral proof (informational)
+              contract  which of several defensible behaviors a project follows where the intended
+                        behavior is ambiguous (informational; it exposes the choice, not a verdict)
   statuses    pass         the check ran and the behavior was observed
               fail         the check ran and the behavior was absent or wrong
               unsupported  the check cannot apply here (unrecognized start command, no browser,
@@ -24,6 +26,7 @@ Usage:
   scripts/check-outcomes.py --case contact-phone --workspace DIR   # check one project directory
 """
 import argparse
+import html
 import json
 import os
 import re
@@ -121,10 +124,10 @@ class Server:
             except OSError:
                 time.sleep(0.2)
 
-    def request(self, path, form=None):
+    def request(self, path, form=None, timeout=10):
         data = urllib.parse.urlencode(form).encode() if form is not None else None
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", data=data, timeout=10) as r:
+            with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", data=data, timeout=timeout) as r:
                 return r.status, r.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
             return e.code, e.read().decode("utf-8", "replace")
@@ -341,11 +344,15 @@ def bakery_vision(ws):
 
 
 class Notifier:
-    """Stand-in SMS gateway. Records every confirmation text and can hold one customer's text
-    until released, which keeps that customer's order request in flight."""
+    """Stand-in SMS gateway. Records every confirmation text it accepts. It can hold one customer's
+    text until released (keeping that order request in flight), reject texts for some customers
+    (HTTP 500, not delivered), or accept and deliver texts for others but answer only after the
+    app's own gateway timeout has passed."""
 
-    def __init__(self, hold_name=None):
-        self.calls, self.hold_name = [], hold_name
+    SLOW_SECONDS = 20  # longer than the fixture's 15-second gateway timeout
+
+    def __init__(self, hold_name=None, reject=(), slow=()):
+        self.calls, self.hold_name, self.reject, self.slow = [], hold_name, set(reject), set(slow)
         self.held = threading.Event()      # the held customer's text has arrived
         self.release = threading.Event()
         notifier = self
@@ -353,7 +360,13 @@ class Notifier:
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+                if body.get("name") in notifier.reject:
+                    self.send_response(500)
+                    self.end_headers()
+                    return
                 notifier.calls.append(body)
+                if body.get("name") in notifier.slow:
+                    time.sleep(notifier.SLOW_SECONDS)
                 if body.get("name") == notifier.hold_name:
                     notifier.held.set()
                     notifier.release.wait(20)  # bounded, so a stuck schedule can never hang the check
@@ -376,11 +389,57 @@ class Notifier:
         self.server.shutdown()
 
 
+DECISION_SENTENCE = "the customer's page only confirms once the text has been handed off"
+
+
+def classify_text_failure(srv, notifier, name):
+    """Places one order whose confirmation text fails, and reports what the customer and owner see."""
+    status, page = srv.request("/order", {"name": name, "phone": "555-0199", "pickup": "9:00", "croissant": "1"}, timeout=40)
+    _, listing = srv.request("/orders")
+    kept = name in listing
+    if status is None:
+        response = "none"
+    elif status == 200 and re.search(r"#\d+", page):
+        response = "confirmed"
+    else:
+        response = "failure"
+    page = html.unescape(page)
+    disclosed = bool(re.search(r"(couldn.t|could not|didn.t|did not|unable|failed|not been)[^.]{0,60}\btext|"
+                               r"\btext[^.]{0,60}(couldn.t|could not|didn.t|did not|failed)", page, re.I))
+    return {"kept": kept, "response": response, "status": status, "disclosed": disclosed,
+            "delivered": name in notifier.names()}
+
+
+def consistent(o):
+    """Behavior every reading of the requirements rejects. Returns a reason, or "" if none applies.
+    The README promises every order appears on the owner's list and every customer gets a text,
+    and the owner reported a confirmation text for an order that was not on the list."""
+    if o["response"] == "none":
+        return "the customer got no response"
+    if o["delivered"] and not o["kept"]:
+        return "the customer was texted a confirmation but the order is not on the owner's list"
+    if o["kept"] and o["response"] == "failure":
+        return "the customer was told the order failed but it is on the owner's list (likely duplicate)"
+    if not o["kept"] and o["response"] == "confirmed":
+        return "the customer was told the order is placed but it is not on the owner's list"
+    return ""
+
+
+def contract_of(o):
+    if not o["kept"] and o["response"] == "failure":
+        return "original"
+    if o["kept"] and o["response"] == "confirmed":
+        return "revised"
+    return "inconsistent"
+
+
 def lost_orders(ws):
     """Fixture contract: GET / (menu), POST /order form fields, GET /orders (owner list),
-    NOTIFY_URL (SMS gateway called for every order), PORT, BAKERY_DATA."""
+    NOTIFY_URL (SMS gateway called for every order), PORT, BAKERY_DATA, and the recorded
+    decision in AGENTS.md that the customer's page confirms only once the text is handed off."""
     check_unittest(ws)
-    notifier = Notifier(hold_name="Alice")
+    contracts = []
+    notifier = Notifier(hold_name="Alice", reject={"Rita"}, slow={"Sam"})
     srv = Server([sys.executable, "app.py"], ws, {"BAKERY_DATA": os.path.join(ws, "data"), "NOTIFY_URL": notifier.url})
     try:
         if srv.state != "up":
@@ -436,9 +495,39 @@ def lost_orders(ws):
         report("every customer gets a confirmation text", "outcome",
                "pass" if all(n in texted for n in ("Carol", "Alice", "Bob")) and "Dan" not in texted else "fail",
                f"texts to: {texted}")
+
+        # When the text cannot be sent. The fixture's documented contract keeps no order without a
+        # handed-off text and tells the customer to call. Keeping the order and confirming it anyway
+        # is a product decision the owner has not made. Both readings are reported, not judged;
+        # behavior that no reading allows fails.
+        for name, label in (("Rita", "gateway rejects the text"),
+                            ("Sam", "gateway accepts the text but answers after the app's timeout")):
+            o = classify_text_failure(srv, notifier, name)
+            reason = consistent(o)
+            detail = (f"kept={o['kept']} customer={o['response']} (HTTP {o['status']}) "
+                      f"text delivered={o['delivered']} failure disclosed={o['disclosed']}")
+            report(f"{label}: customer and owner see the same outcome", "outcome", "fail" if reason else "pass",
+                   f"{reason}; {detail}" if reason else detail)
+            contract = contract_of(o)
+            contracts.append(contract)
+            note = {"original": "original contract: no order without a text, customer asked to call",
+                    "revised": "revised contract: order kept and confirmed without a text"
+                               + ("" if o["disclosed"] else "; the failed text is not disclosed to the customer"),
+                    "inconsistent": "neither contract"}[contract]
+            report(f"{label}: contract followed", "contract", "pass" if contract != "inconsistent" else "fail", note)
     finally:
         srv.stop()
         notifier.stop()
+    agents = os.path.join(ws, "AGENTS.md")
+    record = open(agents, encoding="utf-8").read() if os.path.exists(agents) else ""
+    still_recorded = DECISION_SENTENCE in record
+    if "revised" in contracts:
+        report("decision record matches text-failure behavior", "record", "fail" if still_recorded else "pass",
+               "AGENTS.md still says the page confirms only after the text is handed off" if still_recorded
+               else "the recorded decision was revised")
+    elif contracts and all(c == "original" for c in contracts):
+        report("decision record matches text-failure behavior", "record", "pass" if still_recorded else "fail",
+               "original decision kept" if still_recorded else "AGENTS.md no longer records the kept decision")
 
 
 CASES = {
