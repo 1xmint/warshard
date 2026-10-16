@@ -33,10 +33,12 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 RESULTS = []
 STATUSES = ("pass", "fail", "unsupported", "error")
@@ -338,7 +340,109 @@ def bakery_vision(ws):
         report("README records the no-payments and no-accounts requirements", "record", "fail", "no README")
 
 
+class Notifier:
+    """Stand-in SMS gateway. Records every confirmation text and can hold one customer's text
+    until released, which keeps that customer's order request in flight."""
+
+    def __init__(self, hold_name=None):
+        self.calls, self.hold_name = [], hold_name
+        self.held = threading.Event()      # the held customer's text has arrived
+        self.release = threading.Event()
+        notifier = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+                notifier.calls.append(body)
+                if body.get("name") == notifier.hold_name:
+                    notifier.held.set()
+                    notifier.release.wait(20)  # bounded, so a stuck schedule can never hang the check
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+            def log_message(self, *args):
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}/send"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def names(self):
+        return [c.get("name") for c in self.calls]
+
+    def stop(self):
+        self.release.set()
+        self.server.shutdown()
+
+
+def lost_orders(ws):
+    """Fixture contract: GET / (menu), POST /order form fields, GET /orders (owner list),
+    NOTIFY_URL (SMS gateway called for every order), PORT, BAKERY_DATA."""
+    check_unittest(ws)
+    notifier = Notifier(hold_name="Alice")
+    srv = Server([sys.executable, "app.py"], ws, {"BAKERY_DATA": os.path.join(ws, "data"), "NOTIFY_URL": notifier.url})
+    try:
+        if srv.state != "up":
+            report("bakery site starts", "outcome", "fail", srv.state)
+            return
+        status, page = srv.request("/")
+        report("menu page loads", "outcome", "pass" if status == 200 and "Sourdough loaf" in page else "fail", f"GET / -> {status}")
+
+        def order(name):
+            return srv.request("/order", {"name": name, "phone": "555-0100", "pickup": "9:00", "croissant": "1"})
+
+        status, _ = order("Carol")
+        _, listing = srv.request("/orders")
+        report("a single order appears on the owner's list", "outcome",
+               "pass" if status == 200 and "Carol" in listing else "fail", f"POST /order -> {status}")
+        status, _ = srv.request("/order", {"name": "Dan", "phone": "", "pickup": "9:00", "croissant": "1"})
+        _, listing = srv.request("/orders")
+        report("an order without a phone number is rejected", "outcome",
+               "pass" if status >= 400 and "Dan" not in listing else "fail", f"POST /order -> {status}")
+
+        # Overlapping orders. Alice's confirmation text is held, keeping her request in flight while
+        # Bob orders. Bob gets a bounded window to finish; an implementation that serializes orders
+        # makes Bob wait for Alice, so after the window Alice is released either way.
+        responses = {}
+
+        def place(name):
+            responses[name] = order(name)
+
+        alice = threading.Thread(target=place, args=("Alice",))
+        alice.start()
+        alice_in_flight = notifier.held.wait(10)
+        bob = threading.Thread(target=place, args=("Bob",))
+        bob.start()
+        bob.join(4)
+        notifier.release.set()
+        alice.join(30)
+        bob.join(30)
+        if alice.is_alive() or bob.is_alive():
+            report("overlapping orders are both kept", "outcome", "fail", "an order request never finished")
+            return
+        report("schedule held an order in flight", "signal", "pass" if alice_in_flight else "fail",
+               "Alice's text was held while Bob ordered" if alice_in_flight else "Alice's text never arrived during her request")
+        _, listing = srv.request("/orders")
+        both_ok = all(responses[n][0] == 200 for n in ("Alice", "Bob"))
+        kept = [n for n in ("Alice", "Bob") if n in listing]
+        report("overlapping orders are both kept", "outcome", "pass" if both_ok and len(kept) == 2 else "fail",
+               f"responses {[responses[n][0] for n in ('Alice', 'Bob')]}; on owner list: {kept or 'neither'}")
+        numbers = [re.search(r"#(\d+)", responses[n][1]) for n in ("Alice", "Bob")]
+        numbers = [m.group(1) for m in numbers if m]
+        report("overlapping orders get different numbers", "outcome",
+               "pass" if len(numbers) == 2 and numbers[0] != numbers[1] else "fail", f"confirmed numbers: {numbers}")
+        texted = notifier.names()
+        report("every customer gets a confirmation text", "outcome",
+               "pass" if all(n in texted for n in ("Carol", "Alice", "Bob")) and "Dan" not in texted else "fail",
+               f"texts to: {texted}")
+    finally:
+        srv.stop()
+        notifier.stop()
+
+
 CASES = {
+    "lost-orders": lost_orders,
     "contact-phone": contact_phone,
     "reorder-without-accounts": reorder_without_accounts,
     "headline-color": headline_color,
