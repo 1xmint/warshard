@@ -22,11 +22,14 @@ For each call that has an effect elsewhere (sending, charging, booking, uploadin
 - **Definite failure:** nothing happened.
 - **Unknown:** a timeout, dropped connection, or crash after sending. The effect may have happened.
 
-For each outcome, decide what stored state and the user should be told. Make sure they never contradict each other, and that stated requirements still hold.
+For each outcome, decide what is stored and what the user or caller is told. Make the message, the response status, and the stored state say the same thing. Consider what happens when someone repeats the action after an uncertain answer, such as resubmitting a form or rerunning a job. Make that safe, or say plainly that it is not covered.
 
 Prefer designs that make another attempt safe over treating every error as "nothing happened". Examples are stable identifiers, idempotent requests the service supports, and recording that an attempt is pending.
 
-If no design can satisfy every stated requirement, explain the conflict and ask.
+Check each stated requirement against every outcome, including rare ones. If a requirement would not hold in some outcome, that is a conflict between requirements, not a risk to disclose, and choosing which one gives way belongs to the user. In that case:
+- Implement the safest reversible interim behavior.
+- Say exactly which requirement it breaks, and when.
+- Ask the user to decide.
 
 ## Exercise the paths connected to the complaint
 Test the failure paths that could produce the reported symptom, such as:
