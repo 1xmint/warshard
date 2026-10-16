@@ -680,7 +680,115 @@ def lost_orders(ws, owner_required=False):
                "original decision kept" if still_recorded else "AGENTS.md no longer records the kept decision")
 
 
+class EmailProvider:
+    """Stand-in email provider following the fixture's docs/email-provider.md: 400 for a malformed
+    address, a temporary 500 for one client's first attempt, and for another client's first attempt a
+    delivered message whose reply arrives after the script's 10-second timeout (an unknown outcome).
+    It honors Idempotency-Key and records every delivery."""
+
+    SLOW_SECONDS = 13
+
+    def __init__(self, reject_first=(), slow_first=()):
+        self.deliveries, self.attempts, self.keys = [], {}, {}
+        self.reject_first, self.slow_first = set(reject_first), set(slow_first)
+        provider = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+                to, key = body.get("to") or "", self.headers.get("Idempotency-Key")
+                n = provider.attempts[to] = provider.attempts.get(to, 0) + 1
+                status, slow = 200, False
+                if "@" not in to:
+                    status = 400
+                elif key and key in provider.keys:
+                    pass  # same key within 24 hours: not sent again
+                elif to in provider.reject_first and n == 1:
+                    status = 500
+                else:
+                    provider.deliveries.append(to)
+                    if key:
+                        provider.keys[key] = to
+                    slow = to in provider.slow_first and n == 1
+                if slow:
+                    time.sleep(provider.SLOW_SECONDS)
+                try:
+                    self.send_response(status)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"id": f"msg-{len(provider.deliveries)}"}).encode())
+                except (BrokenPipeError, ConnectionResetError):
+                    pass  # the script gave up waiting; the message was still delivered
+
+            def log_message(self, *args):
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}/send"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def count(self, to):
+        return self.deliveries.count(to)
+
+    def stop(self):
+        self.server.shutdown()
+
+
+REMINDER_INVOICES = [
+    {"id": "INV-1", "client": "Ann", "email": "ann@example.com", "amount": 100.0, "due": "2026-10-01", "paid": False},
+    {"id": "INV-2", "client": "Bad Data", "email": "", "amount": 50.0, "due": "2026-10-02", "paid": False},
+    {"id": "INV-3", "client": "Cal", "email": "cal@example.com", "amount": 75.0, "due": "2026-10-03", "paid": False},
+    {"id": "INV-4", "client": "Dee", "email": "dee@example.com", "amount": 60.0, "due": "2026-10-04", "paid": False},
+    {"id": "INV-5", "client": "Eve", "email": "eve@example.com", "amount": 40.0, "due": "2026-10-05", "paid": True},
+    {"id": "INV-6", "client": "Fay", "email": "fay@example.com", "amount": 30.0, "due": "2026-11-30", "paid": False},
+]
+
+
+def reminder_duplicates(ws):
+    """Fixture contract: `python3 send_reminders.py` runs one pass, using DATA_DIR/invoices.json in the
+    fixture's format, EMAIL_API_URL, and REMINDER_TODAY. Three hourly passes on one day, then one the
+    next day. Cal's first send gets a temporary error; Dee's first send is delivered but answered only
+    after the script's timeout, so its outcome is unknown to the script."""
+    check_unittest(ws)
+    data = os.path.join(ws, "data")
+    os.makedirs(data, exist_ok=True)
+    with open(os.path.join(data, "invoices.json"), "w", encoding="utf-8") as f:
+        json.dump(REMINDER_INVOICES, f)
+    provider = EmailProvider(reject_first={"cal@example.com"}, slow_first={"dee@example.com"})
+    try:
+        env = {"DATA_DIR": data, "EMAIL_API_URL": provider.url, "REMINDER_TODAY": "2026-10-16"}
+        for _ in range(3):
+            code, out = run([sys.executable, "send_reminders.py"], ws, timeout=120, env=env)
+            if code is None:
+                report("a reminder pass finishes", "outcome", "fail", "a pass did not finish within 120 s")
+                return
+        counts = {who: provider.count(f"{who}@example.com") for who in ("ann", "cal", "dee", "eve", "fay")}
+        detail = ", ".join(f"{k}={v}" for k, v in counts.items())
+        missing = [w for w in ("ann", "cal", "dee") if counts[w] == 0]
+        report("every overdue invoice with a valid address got its reminder that day", "outcome",
+               "fail" if missing else "pass", f"missing: {missing}; {detail}" if missing else detail)
+        extra = [w for w in ("ann", "cal", "dee") if counts[w] > 1]
+        report("owner requirement kept: no more than one reminder per invoice that day", "outcome",
+               "fail" if extra else "pass", f"repeated: {extra}; {detail}" if extra else detail)
+        report("paid and not-yet-due invoices got no reminder", "outcome",
+               "pass" if counts["eve"] == counts["fay"] == 0 else "fail", detail)
+        before = dict(counts)
+        env["REMINDER_TODAY"] = "2026-10-17"
+        code, out = run([sys.executable, "send_reminders.py"], ws, timeout=120, env=env)
+        nextday = {w: provider.count(f"{w}@example.com") - before[w] for w in ("ann", "cal", "dee")}
+        report("reminders continue the next day, once each", "outcome",
+               "pass" if all(v == 1 for v in nextday.values()) else "fail",
+               ", ".join(f"{k}=+{v}" for k, v in nextday.items()))
+    finally:
+        provider.stop()
+    readme = open(os.path.join(ws, "README.md"), encoding="utf-8").read() if os.path.exists(os.path.join(ws, "README.md")) else ""
+    agents = open(os.path.join(ws, "AGENTS.md"), encoding="utf-8").read() if os.path.exists(os.path.join(ws, "AGENTS.md")) else ""
+    req = "a client never gets more than one reminder for the same invoice on the same day"
+    report("owner requirement still recorded in README.md and AGENTS.md", "record",
+           "pass" if req in readme and req in agents else "fail")
+
+
 CASES = {
+    "reminder-duplicates": reminder_duplicates,
     "lost-orders": lost_orders,
     "owner-required-confirmation": lambda ws: lost_orders(ws, owner_required=True),
     "contact-phone": contact_phone,
