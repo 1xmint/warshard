@@ -397,13 +397,19 @@ def classify_text_failure(srv, notifier, name):
     status, page = srv.request("/order", {"name": name, "phone": "555-0199", "pickup": "9:00", "croissant": "1"}, timeout=40)
     _, listing = srv.request("/orders")
     kept = name in listing
+    page = html.unescape(page)
+    # Keeping an order is not confirming it: a page can acknowledge a stored order while saying
+    # it is not yet confirmed.
+    pending = re.search(r"\b(pending|unconfirmed|not (yet )?(been )?confirmed|(couldn.t|could not|cannot|can.t) "
+                        r"(yet )?confirm|awaiting confirmation)", page, re.I)
     if status is None:
         response = "none"
-    elif status == 200 and re.search(r"#\d+", page):
+    elif 200 <= status < 300 and pending:
+        response = "pending"
+    elif 200 <= status < 300 and re.search(r"#\d+", page):
         response = "confirmed"
     else:
         response = "failure"
-    page = html.unescape(page)
     disclosed = bool(re.search(r"(couldn.t|could not|didn.t|did not|unable|failed|not been)[^.]{0,60}\btext|"
                                r"\btext[^.]{0,60}(couldn.t|could not|didn.t|did not|failed)", page, re.I))
     return {"kept": kept, "response": response, "status": status, "disclosed": disclosed,
@@ -420,14 +426,24 @@ def consistent(o):
         return "the customer was texted a confirmation but the order is not on the owner's list"
     if o["kept"] and o["response"] == "failure":
         return "the customer was told the order failed but it is on the owner's list (likely duplicate)"
-    if not o["kept"] and o["response"] == "confirmed":
-        return "the customer was told the order is placed but it is not on the owner's list"
+    if not o["kept"] and o["response"] in ("confirmed", "pending"):
+        return "the customer was told the order was received but it is not on the owner's list"
     return ""
+
+
+CONTRACTS = {
+    "documented-discard": "documented contract: no order is kept without a text; the customer is asked to call",
+    "documented-pending": "documented contract: the order is kept as pending and the customer is told it is not yet confirmed",
+    "revised": "revised contract: the order is kept and shown as confirmed without a handed-off text",
+    "inconsistent": "neither contract",
+}
 
 
 def contract_of(o):
     if not o["kept"] and o["response"] == "failure":
-        return "original"
+        return "documented-discard"
+    if o["kept"] and o["response"] == "pending":
+        return "documented-pending"
     if o["kept"] and o["response"] == "confirmed":
         return "revised"
     return "inconsistent"
@@ -510,10 +526,9 @@ def lost_orders(ws):
                    f"{reason}; {detail}" if reason else detail)
             contract = contract_of(o)
             contracts.append(contract)
-            note = {"original": "original contract: no order without a text, customer asked to call",
-                    "revised": "revised contract: order kept and confirmed without a text"
-                               + ("" if o["disclosed"] else "; the failed text is not disclosed to the customer"),
-                    "inconsistent": "neither contract"}[contract]
+            note = CONTRACTS[contract]
+            if contract == "revised" and not o["disclosed"]:
+                note += "; the failed text is not disclosed to the customer"
             report(f"{label}: contract followed", "contract", "pass" if contract != "inconsistent" else "fail", note)
     finally:
         srv.stop()
@@ -525,7 +540,7 @@ def lost_orders(ws):
         report("decision record matches text-failure behavior", "record", "fail" if still_recorded else "pass",
                "AGENTS.md still says the page confirms only after the text is handed off" if still_recorded
                else "the recorded decision was revised")
-    elif contracts and all(c == "original" for c in contracts):
+    elif contracts and all(c.startswith("documented") for c in contracts):
         report("decision record matches text-failure behavior", "record", "pass" if still_recorded else "fail",
                "original decision kept" if still_recorded else "AGENTS.md no longer records the kept decision")
 
