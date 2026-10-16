@@ -13,7 +13,9 @@ These are product goals, not claims of implemented support or measured improveme
 The selected first-slice architecture is deliberately small. The host keeps authentication, billing, model choice, permissions, and execution.
 
 - **Shared engineering guidance** ([`plugin/core.md`](plugin/core.md)) is host-neutral. It covers working toward the intended outcome, proportionate depth, when to ask and when to decide, verification, keeping intent durable, delegation, and precedence.
-- **On-demand depth** comes from skills. The first is [`new-project`](plugin/skills/new-project/SKILL.md), which covers foundations for a project that does not exist yet.
+- **On-demand depth** comes from skills:
+  - [`new-project`](plugin/skills/new-project/SKILL.md) covers foundations for a project that does not exist yet.
+  - [`investigate`](plugin/skills/investigate/SKILL.md) covers diagnosing a reported problem. It separates a discovered cause from the reported symptom, considers unknown outcomes of calls to other systems, and keeps completion claims within demonstrated coverage.
 - **Host-specific notes** ([`plugin/hosts/`](plugin/hosts/)) hold activation, instruction-file, memory, and delegation details for one host. They never repeat the shared guidance.
 - **Activation** in Claude Code is a single `SessionStart` hook. On startup, `/clear`, and compaction, it prints the shared guidance and the Claude Code notes into context. It is not re-run on resume, because the resumed transcript already contains them. The hook needs no runtime beyond the host's own hook shell.
 - **Continuity** has no Keel-specific store. Product requirements go in the project README. Engineering decisions go in the project's agent instruction file. Change rationale goes in commit messages. Private context goes in host memory.
@@ -49,7 +51,7 @@ Not supported yet. Codex documents that it accepts Claude-compatible plugin mani
 
 ## Limitations
 
-- Restructuring, complex investigation, and concept partnering rely on the shared guidance alone; no dedicated skills exist for them yet.
+- Restructuring and concept partnering rely on the shared guidance alone; no dedicated skills exist for them yet.
 - No external detector notices repeated failed fixes. Recovery relies on the guidance.
 - Keel cannot detect other installed plugins that inject conflicting workflows. The guidance gives explicit user and project instructions precedence.
 - Behavior checks use a handful of scenarios. They expose failure mechanisms; they do not establish general benefit.
