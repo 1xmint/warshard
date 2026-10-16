@@ -423,25 +423,34 @@ def place_order(srv, name, phone="555-0100", hidden=None, timeout=10):
     return status, page, hidden
 
 
+# Wording that commits to fulfilling an order, and wording that says it is not settled yet.
+PROMISE = (r"\b(we.ll|we will|will)\s+(still\s+)?(have it|be) ready|\bis ready (at|for)\b|\bready for (you|pickup)\b|"
+           r"\b(is|are) (placed|confirmed|booked|in)\b|\bconfirmed for\b|\bsee you (at|on|then)\b")
+UNSETTLED = (r"pending|unconfirmed|not (yet )?(been )?confirmed|(couldn.t|could not|cannot|can.t|unable to) (yet )?confirm|"
+             r"awaiting confirmation|\b(call|contact|text) (you|us) to confirm\b|\bwill (call|contact) you\b")
+
+
 def classify_text_failure(srv, notifier, name):
     """Places one order whose confirmation text fails, and reports what the customer and owner see."""
     status, page, hidden = place_order(srv, name, phone="555-0199", timeout=40)
     _, listing = srv.request("/orders")
     kept = name in listing
     page = html.unescape(page)
-    # Classify by what the page tells the customer, not by its HTTP status. Keeping an order is not
-    # confirming it: a page can acknowledge a stored order by number while saying it is not yet
-    # confirmed, whatever status code it uses.
+    # Classify by what the page promises the customer, not by its HTTP status or by the word
+    # "confirmed". A page that commits to fulfilling the order ("we'll have it ready") confirms it,
+    # whatever words it avoids; a page that acknowledges the order but says it is not settled yet is
+    # pending; a page that says the order was not taken is a failure.
     numbered = re.search(r"#\s*\d+", page)
-    claims_confirmed = re.search(r"\b(is|are) (placed|confirmed|ready|in)\b|\bconfirmed for\b", page, re.I)
-    unconfirmed = re.search(r"pending|unconfirmed|not (yet )?(been )?confirmed|(couldn.t|could not|cannot|can.t) (yet )?confirm|"
-                            r"awaiting confirmation|\bto confirm\b|received your order", page, re.I)
+    promises = re.search(PROMISE, page, re.I)
+    unsettled = re.search(UNSETTLED, page, re.I)
     if status is None:
         response = "none"
-    elif numbered and unconfirmed and not claims_confirmed:
-        response = "pending"
-    elif numbered and (claims_confirmed or 200 <= status < 300):
+    elif promises:
         response = "confirmed"
+    elif (numbered or re.search(r"receiv\w* your order|we have your order", page, re.I)) and unsettled:
+        response = "pending"
+    elif numbered and 200 <= status < 300:
+        response = "confirmed"  # an order number shown as a success, with nothing saying it is unsettled
     else:
         response = "failure"
     disclosed = bool(re.search(r"(couldn.t|could not|didn.t|did not|unable|failed|not been)[^.]{0,60}\btext|"
@@ -450,6 +459,33 @@ def classify_text_failure(srv, notifier, name):
     flagged = bool(row and re.search(r"pending|not sent|unconfirmed|not confirmed|call", html.unescape(row.group(0)), re.I))
     return {"kept": kept, "response": response, "status": status, "disclosed": disclosed,
             "delivered": name in notifier.names(), "flagged": flagged, "hidden": hidden}
+
+
+def report_whole(label, o, orders_after_retry):
+    """Judges the customer promise, HTTP status, stored state, and repeated submission together:
+    a sound choice in one does not make up for a contradiction in another."""
+    problems = []
+    if o["response"] == "pending":
+        if o["status"] is None or o["status"] >= 400:
+            problems.append(f"acknowledged with HTTP {o['status']}")
+        if not o["kept"]:
+            problems.append("acknowledged but not stored")
+        elif not o["flagged"]:
+            problems.append("stored without marking it for the owner's follow-up")
+    elif o["response"] == "confirmed":
+        if not o["kept"]:
+            problems.append("promised but not stored")
+    elif o["response"] == "failure":
+        if o["kept"]:
+            problems.append("stored although the customer was told it was not taken")
+        if o["status"] is not None and o["status"] < 400:
+            problems.append("reported as not taken with a success status")
+    else:
+        problems.append("no response")
+    if orders_after_retry > 1:
+        problems.append("resubmitting the same page creates a second order")
+    report(f"{label}: promise, status, stored state, and resubmission agree", "aspect",
+           "fail" if problems else "pass", "; ".join(problems) if problems else f"customer told: {o['response']}")
 
 
 def orders_named(srv, name):
@@ -605,6 +641,7 @@ def lost_orders(ws):
                 report(f"{label}: customer retries the same order", "aspect", "pass" if n <= 1 else "fail",
                        f"{n} orders for this customer on the owner's list after the retry"
                        + ("; the retry created a duplicate" if n > 1 else ""))
+                report_whole(label, o, n)
     finally:
         srv.stop()
         notifier.stop()
