@@ -401,15 +401,18 @@ def classify_text_failure(srv, notifier, name):
     _, listing = srv.request("/orders")
     kept = name in listing
     page = html.unescape(page)
-    # Keeping an order is not confirming it: a page can acknowledge a stored order while saying
-    # it is not yet confirmed.
-    pending = re.search(r"\b(pending|unconfirmed|not (yet )?(been )?confirmed|(couldn.t|could not|cannot|can.t) "
-                        r"(yet )?confirm|awaiting confirmation)", page, re.I)
+    # Classify by what the page tells the customer, not by its HTTP status. Keeping an order is not
+    # confirming it: a page can acknowledge a stored order by number while saying it is not yet
+    # confirmed, whatever status code it uses.
+    numbered = re.search(r"#\s*\d+", page)
+    claims_confirmed = re.search(r"\b(is|are) (placed|confirmed|ready|in)\b|\bconfirmed for\b", page, re.I)
+    unconfirmed = re.search(r"pending|unconfirmed|not (yet )?(been )?confirmed|(couldn.t|could not|cannot|can.t) (yet )?confirm|"
+                            r"awaiting confirmation|\bto confirm\b|received your order", page, re.I)
     if status is None:
         response = "none"
-    elif 200 <= status < 300 and pending:
+    elif numbered and unconfirmed and not claims_confirmed:
         response = "pending"
-    elif 200 <= status < 300 and re.search(r"#\d+", page):
+    elif numbered and (claims_confirmed or 200 <= status < 300):
         response = "confirmed"
     else:
         response = "failure"
