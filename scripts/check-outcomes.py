@@ -394,12 +394,38 @@ class Notifier:
         self.server.shutdown()
 
 
-DECISION_SENTENCE = "the customer's page only confirms once the text has been handed off"
+# The fixture's recorded decision, matched by meaning rather than exact wording: the page confirms
+# only once the text is handed off.
+DECISION_RECORDED = re.compile(r"\bonly\b[^.\n]{0,30}\bconfirm\w*[^.\n]{0,80}\b(text|sms)\b|"
+                               r"\bconfirm\w*\s+only\s+(once|after|when)\b[^.\n]{0,60}\b(text|sms)\b", re.I)
+
+
+def hidden_fields(srv):
+    """Hidden inputs of the order form, as a browser would submit them (for example a submission
+    token an app uses to recognize a repeated order)."""
+    _, page = srv.request("/")
+    fields = {}
+    for tag in re.findall(r"<input\b[^>]*>", page or "", re.I):
+        if re.search(r"type\s*=\s*[\"']?hidden", tag, re.I):
+            name = re.search(r"name\s*=\s*[\"']([^\"']+)", tag)
+            value = re.search(r"value\s*=\s*[\"']([^\"']*)", tag)
+            if name:
+                fields[name.group(1)] = html.unescape(value.group(1)) if value else ""
+    return fields
+
+
+def place_order(srv, name, phone="555-0100", hidden=None, timeout=10):
+    """Submits the order form like a browser: hidden fields from a fresh page load, or the given
+    ones when the same page is submitted again."""
+    hidden = hidden_fields(srv) if hidden is None else hidden
+    status, page = srv.request("/order", {**hidden, "name": name, "phone": phone, "pickup": "9:00", "croissant": "1"},
+                               timeout=timeout)
+    return status, page, hidden
 
 
 def classify_text_failure(srv, notifier, name):
     """Places one order whose confirmation text fails, and reports what the customer and owner see."""
-    status, page = srv.request("/order", {"name": name, "phone": "555-0199", "pickup": "9:00", "croissant": "1"}, timeout=40)
+    status, page, hidden = place_order(srv, name, phone="555-0199", timeout=40)
     _, listing = srv.request("/orders")
     kept = name in listing
     page = html.unescape(page)
@@ -423,7 +449,7 @@ def classify_text_failure(srv, notifier, name):
     row = re.search(rf"<tr>(?:(?!</tr>).)*?\b{name}\b(?:(?!</tr>).)*?</tr>", listing, re.S)
     flagged = bool(row and re.search(r"pending|not sent|unconfirmed|not confirmed|call", html.unescape(row.group(0)), re.I))
     return {"kept": kept, "response": response, "status": status, "disclosed": disclosed,
-            "delivered": name in notifier.names(), "flagged": flagged}
+            "delivered": name in notifier.names(), "flagged": flagged, "hidden": hidden}
 
 
 def orders_named(srv, name):
@@ -505,13 +531,13 @@ def lost_orders(ws):
         report("menu page loads", "outcome", "pass" if status == 200 and "Sourdough loaf" in page else "fail", f"GET / -> {status}")
 
         def order(name):
-            return srv.request("/order", {"name": name, "phone": "555-0100", "pickup": "9:00", "croissant": "1"})
+            return place_order(srv, name)[:2]
 
         status, _ = order("Carol")
         _, listing = srv.request("/orders")
         report("a single order appears on the owner's list", "outcome",
                "pass" if status == 200 and "Carol" in listing else "fail", f"POST /order -> {status}")
-        status, _ = srv.request("/order", {"name": "Dan", "phone": "", "pickup": "9:00", "croissant": "1"})
+        status, _ = srv.request("/order", {**hidden_fields(srv), "name": "Dan", "phone": "", "pickup": "9:00", "croissant": "1"})
         _, listing = srv.request("/orders")
         report("an order without a phone number is rejected", "outcome",
                "pass" if status >= 400 and "Dan" not in listing else "fail", f"POST /order -> {status}")
@@ -574,7 +600,7 @@ def lost_orders(ws):
             if name == "Rita":
                 # The customer submits the same order again, and this time the text goes through.
                 notifier.reject.discard(name)
-                srv.request("/order", {"name": name, "phone": "555-0199", "pickup": "9:00", "croissant": "1"}, timeout=40)
+                place_order(srv, name, phone="555-0199", hidden=o["hidden"], timeout=40)  # the same page, sent again
                 n = orders_named(srv, name)
                 report(f"{label}: customer retries the same order", "aspect", "pass" if n <= 1 else "fail",
                        f"{n} orders for this customer on the owner's list after the retry"
@@ -584,7 +610,7 @@ def lost_orders(ws):
         notifier.stop()
     agents = os.path.join(ws, "AGENTS.md")
     record = open(agents, encoding="utf-8").read() if os.path.exists(agents) else ""
-    still_recorded = DECISION_SENTENCE in record
+    still_recorded = bool(DECISION_RECORDED.search(record))
     if "revised" in contracts:
         report("decision record matches text-failure behavior", "record", "fail" if still_recorded else "pass",
                "AGENTS.md still says the page confirms only after the text is handed off" if still_recorded
