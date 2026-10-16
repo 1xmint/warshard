@@ -370,9 +370,12 @@ class Notifier:
                 if body.get("name") == notifier.hold_name:
                     notifier.held.set()
                     notifier.release.wait(20)  # bounded, so a stuck schedule can never hang the check
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b"{}")
+                try:
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(b"{}")
+                except (BrokenPipeError, ConnectionResetError):
+                    pass  # the app gave up waiting (its own timeout); the text still counts as delivered
 
             def log_message(self, *args):
                 pass
@@ -625,9 +628,10 @@ def main():
             key = (entry["case"], r["category"], r["check"])
             counts = summary.setdefault(key, {"with": [0] * 4, "without": [0] * 4})
             counts[entry["arm"]][STATUSES.index(r["status"])] += 1
-    print(f"{'case':<26}{'category':<10}{'check':<62}{'with p/f/u/e':<14}without p/f/u/e")
+    width = max(len(check) for _, _, check in summary) + 2
+    print(f"{'case':<30}{'category':<10}{'check':<{width}}{'with p/f/u/e':<14}without p/f/u/e")
     for (case, category, check), c in sorted(summary.items()):
-        print(f"{case:<26}{category:<10}{check:<62}{'/'.join(map(str, c['with'])):<14}{'/'.join(map(str, c['without']))}")
+        print(f"{case:<30}{category:<10}{check:<{width}}{'/'.join(map(str, c['with'])):<14}{'/'.join(map(str, c['without']))}")
     print()
     for entry in out:
         if entry["verdict"] != "pass":
