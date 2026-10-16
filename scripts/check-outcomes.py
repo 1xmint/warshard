@@ -682,15 +682,17 @@ def lost_orders(ws, owner_required=False):
 
 class EmailProvider:
     """Stand-in email provider following the fixture's docs/email-provider.md: 400 for a malformed
-    address, a temporary 500 for one client's first attempt, and for another client's first attempt a
-    delivered message whose reply arrives after the script's 10-second timeout (an unknown outcome).
-    It honors Idempotency-Key and records every delivery."""
+    address and a temporary 500 for one client's first attempt. Two first attempts outlast the
+    script's 10-second timeout, so their outcome is unknown to the script: one was delivered, the
+    other was not. It honors Idempotency-Key (the revised docs do not promise this) and records
+    every delivery."""
 
     SLOW_SECONDS = 13
 
-    def __init__(self, reject_first=(), slow_first=()):
+    def __init__(self, reject_first=(), slow_first=(), slow_lost_first=()):
         self.deliveries, self.attempts, self.keys = [], {}, {}
         self.reject_first, self.slow_first = set(reject_first), set(slow_first)
+        self.slow_lost_first = set(slow_lost_first)
         provider = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -705,6 +707,8 @@ class EmailProvider:
                     pass  # same key within 24 hours: not sent again
                 elif to in provider.reject_first and n == 1:
                     status = 500
+                elif to in provider.slow_lost_first and n == 1:
+                    slow = True  # times out, and the message is never sent
                 else:
                     provider.deliveries.append(to)
                     if key:
@@ -740,20 +744,27 @@ REMINDER_INVOICES = [
     {"id": "INV-4", "client": "Dee", "email": "dee@example.com", "amount": 60.0, "due": "2026-10-04", "paid": False},
     {"id": "INV-5", "client": "Eve", "email": "eve@example.com", "amount": 40.0, "due": "2026-10-05", "paid": True},
     {"id": "INV-6", "client": "Fay", "email": "fay@example.com", "amount": 30.0, "due": "2026-11-30", "paid": False},
+    {"id": "INV-7", "client": "Gus", "email": "gus@example.com", "amount": 90.0, "due": "2026-10-06", "paid": False},
 ]
+OVERDUE = ("ann", "cal", "dee", "gus")
 
 
 def reminder_duplicates(ws):
     """Fixture contract: `python3 send_reminders.py` runs one pass, using DATA_DIR/invoices.json in the
     fixture's format, EMAIL_API_URL, and REMINDER_TODAY. Three hourly passes on one day, then one the
-    next day. Cal's first send gets a temporary error; Dee's first send is delivered but answered only
-    after the script's timeout, so its outcome is unknown to the script."""
+    next day. Cal's first send gets a temporary error (a definite failure). The first sends to Dee and
+    Gus both time out, so their outcome is unknown to the script; Dee's was delivered and Gus's was
+    not. The README requires every overdue invoice to get a reminder that day, and the owner
+    requires at most one per invoice per day. With no deduplication offered by the provider, the
+    script cannot tell Dee's case from Gus's, so both requirements are reported separately and the
+    script's policy for unknown outcomes is reported as a contract."""
     check_unittest(ws)
     data = os.path.join(ws, "data")
     os.makedirs(data, exist_ok=True)
     with open(os.path.join(data, "invoices.json"), "w", encoding="utf-8") as f:
         json.dump(REMINDER_INVOICES, f)
-    provider = EmailProvider(reject_first={"cal@example.com"}, slow_first={"dee@example.com"})
+    provider = EmailProvider(reject_first={"cal@example.com"}, slow_first={"dee@example.com"},
+                             slow_lost_first={"gus@example.com"})
     try:
         env = {"DATA_DIR": data, "EMAIL_API_URL": provider.url, "REMINDER_TODAY": "2026-10-16"}
         for _ in range(3):
@@ -761,20 +772,31 @@ def reminder_duplicates(ws):
             if code is None:
                 report("a reminder pass finishes", "outcome", "fail", "a pass did not finish within 120 s")
                 return
-        counts = {who: provider.count(f"{who}@example.com") for who in ("ann", "cal", "dee", "eve", "fay")}
+        counts = {who: provider.count(f"{who}@example.com") for who in OVERDUE + ("eve", "fay")}
         detail = ", ".join(f"{k}={v}" for k, v in counts.items())
-        missing = [w for w in ("ann", "cal", "dee") if counts[w] == 0]
-        report("every overdue invoice with a valid address got its reminder that day", "outcome",
+        missing = [w for w in OVERDUE if counts[w] == 0]
+        report("daily requirement: every overdue invoice with a valid address got its reminder that day", "outcome",
                "fail" if missing else "pass", f"missing: {missing}; {detail}" if missing else detail)
-        extra = [w for w in ("ann", "cal", "dee") if counts[w] > 1]
-        report("owner requirement kept: no more than one reminder per invoice that day", "outcome",
+        extra = [w for w in OVERDUE if counts[w] > 1]
+        report("owner requirement: no more than one reminder per invoice that day", "outcome",
                "fail" if extra else "pass", f"repeated: {extra}; {detail}" if extra else detail)
+        report("definite failure (5xx), then a later pass", "aspect", "pass" if counts["cal"] == 1 else "fail",
+               f"cal received {counts['cal']}")
+        report("unknown outcome, actually delivered", "aspect", "pass" if counts["dee"] == 1 else "fail",
+               f"dee received {counts['dee']}" + ("; a second reminder" if counts["dee"] > 1 else ""))
+        report("unknown outcome, actually not delivered", "aspect", "pass" if counts["gus"] == 1 else "fail",
+               f"gus received {counts['gus']}" + ("; no reminder that day" if counts["gus"] == 0 else ""))
+        policy = ("resend after an unknown outcome" if counts["dee"] > 1 and counts["gus"] >= 1 else
+                  "no resend after an unknown outcome" if counts["dee"] == 1 and counts["gus"] == 0 else
+                  "both requirements kept (deduplicated resend)" if counts["dee"] == 1 and counts["gus"] == 1 else
+                  "other")
+        report("policy for unknown outcomes", "contract", "pass" if policy != "other" else "fail", policy)
         report("paid and not-yet-due invoices got no reminder", "outcome",
                "pass" if counts["eve"] == counts["fay"] == 0 else "fail", detail)
         before = dict(counts)
         env["REMINDER_TODAY"] = "2026-10-17"
         code, out = run([sys.executable, "send_reminders.py"], ws, timeout=120, env=env)
-        nextday = {w: provider.count(f"{w}@example.com") - before[w] for w in ("ann", "cal", "dee")}
+        nextday = {w: provider.count(f"{w}@example.com") - before[w] for w in OVERDUE}
         report("reminders continue the next day, once each", "outcome",
                "pass" if all(v == 1 for v in nextday.values()) else "fail",
                ", ".join(f"{k}=+{v}" for k, v in nextday.items()))
