@@ -11,6 +11,8 @@ Each check reports a category and a status:
               signal    a limited indicator, not behavioral proof (informational)
               contract  which of several defensible behaviors a project follows where the intended
                         behavior is ambiguous (informational; it exposes the choice, not a verdict)
+              aspect    one facet of a behavior reported on its own, such as the HTTP status or what a
+                        retry does (informational)
   statuses    pass         the check ran and the behavior was observed
               fail         the check ran and the behavior was absent or wrong
               unsupported  the check cannot apply here (unrecognized start command, no browser,
@@ -418,8 +420,40 @@ def classify_text_failure(srv, notifier, name):
         response = "failure"
     disclosed = bool(re.search(r"(couldn.t|could not|didn.t|did not|unable|failed|not been)[^.]{0,60}\btext|"
                                r"\btext[^.]{0,60}(couldn.t|could not|didn.t|did not|failed)", page, re.I))
+    row = re.search(rf"<tr>(?:(?!</tr>).)*?\b{name}\b(?:(?!</tr>).)*?</tr>", listing, re.S)
+    flagged = bool(row and re.search(r"pending|not sent|unconfirmed|not confirmed|call", html.unescape(row.group(0)), re.I))
     return {"kept": kept, "response": response, "status": status, "disclosed": disclosed,
-            "delivered": name in notifier.names()}
+            "delivered": name in notifier.names(), "flagged": flagged}
+
+
+def orders_named(srv, name):
+    _, listing = srv.request("/orders")
+    return len(re.findall(rf">\s*{name}\s*<", listing))
+
+
+def report_aspects(label, o):
+    """Reports the customer message, HTTP status, and stored state of one text-failure order
+    separately, so a sound choice in one is not hidden by a weak one in another."""
+    report(f"{label}: customer is told", "aspect", "pass",
+           {"confirmed": "the order is confirmed", "pending": "the order was received but is not confirmed",
+            "failure": "the order was not taken", "none": "nothing (no response)"}[o["response"]]
+           + ("; the failed text is mentioned" if o["disclosed"] else ""))
+    status = o["status"]
+    if status is None:
+        note, ok = "no response", False
+    elif o["response"] in ("confirmed", "pending") and status >= 400:
+        note, ok = (f"HTTP {status} with a page that acknowledges the order: browsers show it, but scripts, "
+                    "proxies, or clients that retry on errors may treat the order as failed"), False
+    elif o["response"] == "failure" and status < 400:
+        note, ok = f"HTTP {status} with a page saying the order was not taken", False
+    else:
+        note, ok = f"HTTP {status}, consistent with the message", True
+    report(f"{label}: HTTP status", "aspect", "pass" if ok else "fail", note)
+    if o["kept"]:
+        state = "kept on the owner's list" + (", marked as needing follow-up" if o["flagged"] else ", not marked as needing follow-up")
+    else:
+        state = "not stored"
+    report(f"{label}: stored state", "aspect", "pass", state)
 
 
 def consistent(o):
@@ -536,6 +570,15 @@ def lost_orders(ws):
             if contract == "revised" and not o["disclosed"]:
                 note += "; the failed text is not disclosed to the customer"
             report(f"{label}: contract followed", "contract", "pass" if contract != "inconsistent" else "fail", note)
+            report_aspects(label, o)
+            if name == "Rita":
+                # The customer submits the same order again, and this time the text goes through.
+                notifier.reject.discard(name)
+                srv.request("/order", {"name": name, "phone": "555-0199", "pickup": "9:00", "croissant": "1"}, timeout=40)
+                n = orders_named(srv, name)
+                report(f"{label}: customer retries the same order", "aspect", "pass" if n <= 1 else "fail",
+                       f"{n} orders for this customer on the owner's list after the retry"
+                       + ("; the retry created a duplicate" if n > 1 else ""))
     finally:
         srv.stop()
         notifier.stop()
