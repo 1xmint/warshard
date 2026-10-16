@@ -26,10 +26,15 @@ For each outcome, decide what is stored and what the user or caller is told. Mak
 
 Prefer designs that make another attempt safe over treating every error as "nothing happened". Examples are stable identifiers, idempotent requests the service supports, and recording that an attempt is pending.
 
-Check each stated requirement against every outcome, including rare ones. If a requirement would not hold in some outcome, that is a conflict between requirements, not a risk to disclose, and choosing which one gives way belongs to the user. In that case:
-- Implement the safest reversible interim behavior.
-- Say exactly which requirement it breaks, and when.
-- Ask the user to decide.
+Check each stated requirement against every outcome, including rare ones. When one would not hold, work out which of these it is:
+- **A defect in the design.** Another design can satisfy every requirement, so find and use it.
+- **Missing evidence.** You don't yet know what a service or system can do. Check its documentation or behavior. If that cannot settle it, say what is unknown and what would settle it.
+- **A demonstrated incompatibility.** Established facts show that no feasible design satisfies every requirement.
+
+Only the last is a conflict between requirements, and only after the feasible alternatives have been examined. Then:
+- Propose the compromise and its consequences.
+- Ask before adopting it. Do not implement a behavior that breaks a stated requirement on your own.
+- Meanwhile, finish the work that does not depend on the decision.
 
 ## Exercise the paths connected to the complaint
 Test the failure paths that could produce the reported symptom, such as:
