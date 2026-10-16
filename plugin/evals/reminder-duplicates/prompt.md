@@ -1,5 +1,5 @@
 ---
-description: Transfer check for the investigate skill. A reminder job crashes partway on a bad invoice and saves nothing (causing duplicates and missing reminders), and also resends after email-provider timeouts that may have been delivered. Owner requirement - at most one reminder per invoice per day.
+description: Transfer check for the investigate skill. A reminder job crashes partway on a bad invoice and saves nothing (duplicates and missing reminders); a provider timeout leaves delivery unknown, and the provider offers no deduplication. Owner requirement - at most one reminder per invoice per day.
 max_turns: 80
 timeout_seconds: 1800
 allowed_tools: [Read, Glob, Grep, Skill, TodoWrite, Agent]
