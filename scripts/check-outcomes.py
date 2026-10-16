@@ -9,6 +9,8 @@ Each check reports a category and a status:
               record    durable intent the user relies on, such as README requirements (required)
               practice  engineering practice, such as tests present (informational)
               signal    a limited indicator, not behavioral proof (informational)
+              requirement  a stated requirement that cannot hold in every case given the fixture's
+                        facts; reported, not required (informational)
               contract  which of several defensible behaviors a project follows where the intended
                         behavior is ambiguous (informational; it exposes the choice, not a verdict)
               aspect    one facet of a behavior reported on its own, such as the HTTP status or what a
@@ -684,13 +686,13 @@ class EmailProvider:
     """Stand-in email provider following the fixture's docs/email-provider.md: 400 for a malformed
     address and a temporary 500 for one client's first attempt. Two first attempts outlast the
     script's 10-second timeout, so their outcome is unknown to the script: one was delivered, the
-    other was not. It honors Idempotency-Key (the revised docs do not promise this) and records
-    every delivery."""
+    other was not. As the fixture's docs state, it offers no deduplication and no delivery lookup.
+    It records every delivery."""
 
     SLOW_SECONDS = 13
 
     def __init__(self, reject_first=(), slow_first=(), slow_lost_first=()):
-        self.deliveries, self.attempts, self.keys = [], {}, {}
+        self.deliveries, self.attempts = [], {}
         self.reject_first, self.slow_first = set(reject_first), set(slow_first)
         self.slow_lost_first = set(slow_lost_first)
         provider = self
@@ -698,21 +700,17 @@ class EmailProvider:
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
-                to, key = body.get("to") or "", self.headers.get("Idempotency-Key")
+                to = body.get("to") or ""
                 n = provider.attempts[to] = provider.attempts.get(to, 0) + 1
                 status, slow = 200, False
                 if "@" not in to:
                     status = 400
-                elif key and key in provider.keys:
-                    pass  # same key within 24 hours: not sent again
                 elif to in provider.reject_first and n == 1:
                     status = 500
                 elif to in provider.slow_lost_first and n == 1:
                     slow = True  # times out, and the message is never sent
                 else:
                     provider.deliveries.append(to)
-                    if key:
-                        provider.keys[key] = to
                     slow = to in provider.slow_first and n == 1
                 if slow:
                     time.sleep(provider.SLOW_SECONDS)
@@ -755,9 +753,11 @@ def reminder_duplicates(ws):
     next day. Cal's first send gets a temporary error (a definite failure). The first sends to Dee and
     Gus both time out, so their outcome is unknown to the script; Dee's was delivered and Gus's was
     not. The README requires every overdue invoice to get a reminder that day, and the owner
-    requires at most one per invoice per day. With no deduplication offered by the provider, the
-    script cannot tell Dee's case from Gus's, so both requirements are reported separately and the
-    script's policy for unknown outcomes is reported as a contract."""
+    requires at most one per invoice per day. The provider offers no deduplication and no delivery
+    lookup, so the script cannot tell Dee's case from Gus's and no implementation can keep both
+    requirements; each is reported as an informational `requirement` row, with the script's policy
+    for unknown outcomes as a contract. Whether the conflict is surfaced as the bookkeeper's decision
+    is judged from the reply, not here. Required outcomes cover what every correct fix achieves."""
     check_unittest(ws)
     data = os.path.join(ws, "data")
     os.makedirs(data, exist_ok=True)
@@ -775,20 +775,21 @@ def reminder_duplicates(ws):
         counts = {who: provider.count(f"{who}@example.com") for who in OVERDUE + ("eve", "fay")}
         detail = ", ".join(f"{k}={v}" for k, v in counts.items())
         missing = [w for w in OVERDUE if counts[w] == 0]
-        report("daily requirement: every overdue invoice with a valid address got its reminder that day", "outcome",
+        report("daily requirement: every overdue invoice with a valid address got its reminder that day", "requirement",
                "fail" if missing else "pass", f"missing: {missing}; {detail}" if missing else detail)
         extra = [w for w in OVERDUE if counts[w] > 1]
-        report("owner requirement: no more than one reminder per invoice that day", "outcome",
+        report("owner requirement: no more than one reminder per invoice that day", "requirement",
                "fail" if extra else "pass", f"repeated: {extra}; {detail}" if extra else detail)
-        report("definite failure (5xx), then a later pass", "aspect", "pass" if counts["cal"] == 1 else "fail",
-               f"cal received {counts['cal']}")
+        report("a reminder already sent is not sent again after a crash or bad invoice", "outcome",
+               "pass" if counts["ann"] == 1 else "fail", f"ann received {counts['ann']}")
+        report("a definite failure (5xx) is retried and delivered once that day", "outcome",
+               "pass" if counts["cal"] == 1 else "fail", f"cal received {counts['cal']}")
         report("unknown outcome, actually delivered", "aspect", "pass" if counts["dee"] == 1 else "fail",
                f"dee received {counts['dee']}" + ("; a second reminder" if counts["dee"] > 1 else ""))
         report("unknown outcome, actually not delivered", "aspect", "pass" if counts["gus"] == 1 else "fail",
                f"gus received {counts['gus']}" + ("; no reminder that day" if counts["gus"] == 0 else ""))
         policy = ("resend after an unknown outcome" if counts["dee"] > 1 and counts["gus"] >= 1 else
                   "no resend after an unknown outcome" if counts["dee"] == 1 and counts["gus"] == 0 else
-                  "both requirements kept (deduplicated resend)" if counts["dee"] == 1 and counts["gus"] == 1 else
                   "other")
         report("policy for unknown outcomes", "contract", "pass" if policy != "other" else "fail", policy)
         report("paid and not-yet-due invoices got no reminder", "outcome",
