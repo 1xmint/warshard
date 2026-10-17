@@ -1,21 +1,37 @@
 {
-  "version": 1,
+  "version": 2,
   "classes": {
     "briarwarden": {
       "name": "Briarwarden",
       "description": "Hold the line. Close the distance, silence a spell, and awaken the living crown.",
       "base_form": "warden",
-      "ultimate_forms": ["verdant_crown"],
+      "ultimate_forms": [
+        "verdant_crown"
+      ],
       "health": 1500,
-      "color": "#6ad9bb"
+      "color": "#6ad9bb",
+      "mobility": {
+        "name": "Briar Rush",
+        "distance": 5000,
+        "cooldown": 240,
+        "retreat": false
+      }
     },
     "ashweaver": {
       "name": "Ashweaver",
       "description": "Control the field. Weave embers, interrupt your rival, and become a falling star.",
       "base_form": "weaver",
-      "ultimate_forms": ["solar_ascendant"],
+      "ultimate_forms": [
+        "solar_ascendant"
+      ],
       "health": 1250,
-      "color": "#f0a56f"
+      "color": "#f0a56f",
+      "mobility": {
+        "name": "Ashstep",
+        "distance": 4500,
+        "cooldown": 280,
+        "retreat": true
+      }
     }
   },
   "forms": {
@@ -464,34 +480,202 @@
       ]
     }
   },
-  "arena": {
-    "half_x": 14000,
-    "half_z": 10000,
-    "obstacles": [
-      {
-        "pos": {
-          "x": 0,
-          "z": 4700
+  "maps": {
+    "shattered_court": {
+      "half_x": 14000,
+      "half_z": 10000,
+      "obstacles": [
+        {
+          "pos": {
+            "x": 0,
+            "z": 4700
+          },
+          "radius": 1200
         },
-        "radius": 1200
-      },
-      {
-        "pos": {
-          "x": 0,
-          "z": -4700
+        {
+          "pos": {
+            "x": 0,
+            "z": -4700
+          },
+          "radius": 1200
+        }
+      ],
+      "spawns": [
+        {
+          "x": -5500,
+          "z": 0
         },
-        "radius": 1200
-      }
-    ],
-    "spawns": [
-      {
-        "x": -5500,
-        "z": 0
-      },
-      {
-        "x": 5500,
-        "z": 0
-      }
-    ]
+        {
+          "x": 5500,
+          "z": 0
+        }
+      ],
+      "name": "The Shattered Court"
+    },
+    "riftwood_crossing": {
+      "half_x": 26000,
+      "half_z": 15000,
+      "spawns": [
+        {
+          "x": -22000,
+          "z": 0
+        },
+        {
+          "x": 22000,
+          "z": 0
+        }
+      ],
+      "obstacles": [
+        {
+          "pos": {
+            "x": -12000,
+            "z": 5000
+          },
+          "radius": 1800
+        },
+        {
+          "pos": {
+            "x": -12000,
+            "z": -5000
+          },
+          "radius": 1800
+        },
+        {
+          "pos": {
+            "x": 12000,
+            "z": 5000
+          },
+          "radius": 1800
+        },
+        {
+          "pos": {
+            "x": 12000,
+            "z": -5000
+          },
+          "radius": 1800
+        },
+        {
+          "pos": {
+            "x": -4000,
+            "z": 0
+          },
+          "radius": 1800
+        },
+        {
+          "pos": {
+            "x": 4000,
+            "z": 0
+          },
+          "radius": 1800
+        },
+        {
+          "pos": {
+            "x": 0,
+            "z": 8500
+          },
+          "radius": 2000
+        },
+        {
+          "pos": {
+            "x": 0,
+            "z": -8500
+          },
+          "radius": 2000
+        }
+      ],
+      "name": "Riftwood Crossing"
+    }
+  },
+  "playlists": {
+    "arena_1": {
+      "name": "1v1 The Shattered Court",
+      "map": "shattered_court",
+      "team_size": 1,
+      "kind": "arena",
+      "enabled": true,
+      "time_limit": 6000,
+      "capture_limit": 3,
+      "respawn": 160
+    },
+    "arena_2": {
+      "name": "2v2 The Shattered Court",
+      "map": "shattered_court",
+      "team_size": 2,
+      "kind": "arena",
+      "enabled": true,
+      "time_limit": 6000,
+      "capture_limit": 3,
+      "respawn": 160
+    },
+    "arena_3": {
+      "name": "3v3 The Shattered Court",
+      "map": "shattered_court",
+      "team_size": 3,
+      "kind": "arena",
+      "enabled": true,
+      "time_limit": 6000,
+      "capture_limit": 3,
+      "respawn": 160
+    },
+    "arena_4": {
+      "name": "4v4 The Shattered Court",
+      "map": "shattered_court",
+      "team_size": 4,
+      "kind": "arena",
+      "enabled": true,
+      "time_limit": 6000,
+      "capture_limit": 3,
+      "respawn": 160
+    },
+    "arena_5": {
+      "name": "5v5 The Shattered Court",
+      "map": "shattered_court",
+      "team_size": 5,
+      "kind": "arena",
+      "enabled": true,
+      "time_limit": 6000,
+      "capture_limit": 3,
+      "respawn": 160
+    },
+    "ctf_6": {
+      "name": "6v6 Riftwood Crossing",
+      "map": "riftwood_crossing",
+      "team_size": 6,
+      "kind": "ctf",
+      "enabled": true,
+      "time_limit": 12000,
+      "capture_limit": 3,
+      "respawn": 160
+    },
+    "ctf_10": {
+      "name": "10v10 Riftwood Crossing",
+      "map": "riftwood_crossing",
+      "team_size": 10,
+      "kind": "ctf",
+      "enabled": true,
+      "time_limit": 12000,
+      "capture_limit": 3,
+      "respawn": 160
+    },
+    "ctf_20": {
+      "name": "20v20 Riftwood Crossing",
+      "map": "riftwood_crossing",
+      "team_size": 20,
+      "kind": "ctf",
+      "enabled": false,
+      "time_limit": 12000,
+      "capture_limit": 3,
+      "respawn": 160
+    },
+    "ctf_40": {
+      "name": "40v40 Riftwood Crossing",
+      "map": "riftwood_crossing",
+      "team_size": 40,
+      "kind": "ctf",
+      "enabled": false,
+      "time_limit": 12000,
+      "capture_limit": 3,
+      "respawn": 160
+    }
   }
 }

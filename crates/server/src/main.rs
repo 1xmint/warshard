@@ -1,4 +1,6 @@
+mod bots;
 mod network;
+mod queue;
 mod room;
 use axum::{Router, extract::State, routing::get};
 use network::upgrade;
@@ -26,6 +28,7 @@ struct App {
     metrics: Arc<Metrics>,
     sockets: Arc<Semaphore>,
     origins: Arc<Vec<String>>,
+    queue: Arc<Mutex<queue::QueuePool>>,
 }
 #[derive(Clone)]
 struct Room {
@@ -59,6 +62,10 @@ enum Command {
         id: u32,
         generation: u32,
     },
+    Exit {
+        id: u32,
+        generation: u32,
+    },
 }
 
 #[tokio::main]
@@ -78,10 +85,11 @@ async fn main() {
         metrics: Default::default(),
         sockets: Arc::new(Semaphore::new(128)),
         origins: Arc::new(origins),
+        queue: Default::default(),
     };
     let router = Router::new()
         .route("/ws", get(upgrade))
-        .route("/health", get(|| async { "warshard protocol=1\n" }))
+        .route("/health", get(|| async { "warshard protocol=2\n" }))
         .route("/metrics", get(metrics))
         .with_state(app);
     let bind = std::env::var("BIND").unwrap_or_else(|_| "127.0.0.1:3001".into());

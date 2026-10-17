@@ -1,8 +1,8 @@
 # Warshard
 
-An original browser fantasy PvP game: deliberate target-based combat, readable positioning, and temporary transformations. First milestone: a two-player arena between the **Briarwarden**, an armored melee fighter, and the **Ashweaver**, a spellcaster. Long-term targets are 10v10 battlegrounds and measured exploration of 40v40; neither capacity is claimed by this slice.
+An original browser fantasy PvP game: deliberate target-based combat, readable positioning, and temporary transformations. Play the **Briarwarden**, an armored melee fighter, or the **Ashweaver**, a spellcaster, in team arenas or capture-the-flag battlegrounds. Arenas support 1v1, 2v2, 3v3, 4v4 and 5v5. Battleground playlists support 6v6 and 10v10; 20v20 and 40v40 remain disabled pending capacity work. Exactly two maps: **The Shattered Court** for every arena size and **Riftwood Crossing** shared by both battleground sizes.
 
-WASD moves; Tab or clicking a character selects an enemy; 1–5 use the active form's kit; R transforms at full energy. Ground abilities enter placement mode, confirmed by clicking terrain; Escape cancels. Facing follows movement/combat automatically. No dodge rolls or mandatory skillshots. All assets are original procedural placeholders.
+WASD moves; Tab or clicking a character selects an enemy; 1–5 use the active form's kit; Q uses class mobility (Briar Rush closes toward an enemy; Ashstep retreats); R transforms at full energy. Roots block mobility and diminish across repeated applications: full, half, quarter, then immune, resetting after 18 seconds without another root. Ground abilities enter placement mode, confirmed by clicking terrain; Escape cancels. Facing follows movement/combat automatically. No dodge rolls or mandatory skillshots. All assets are original procedural placeholders.
 
 ## Run and validate
 
@@ -13,7 +13,9 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:5173 in two tabs, choose classes, and join the same room. The command starts Rust at 127.0.0.1:3001 and Vite at 127.0.0.1:5173. First compilation takes longer. A round starts with two connected players, ends on a defeat, and restarts after intermission. Reload attempts to recover the tab's guest slot.
+Open http://localhost:5173 → Play → choose a match size → select a class. **Queue match** waits for a full human roster; cancel returns to the menu. **Practice with labelled bots** immediately fills your chosen roster with bots for solo testing. Bots move, fight and pursue flags through ordinary validated intents; they are basic test opponents. Results return to the main menu for another match. Classes explains the kits; Settings changes render resolution; Equipment is visibly unavailable.
+
+The command starts Rust at 127.0.0.1:3001 and Vite at 127.0.0.1:5173. First compilation takes longer. Restart it after Rust or game-data changes. Reload attempts to recover the same guest slot for 30 seconds; disconnected characters remain vulnerable and drop carried flags. Explicit leave ends your slot. For direct two-tab combat regression testing, open `/?direct=1` and join the same named room; only this development path automatically rematches.
 
 For two computers on a trusted LAN, set `CLIENT_HOST=0.0.0.0` and `ALLOWED_ORIGINS=http://YOUR-LAN-IP:5173` before `npm run dev`; open that LAN URL in both browsers. On PowerShell use `$env:CLIENT_HOST="0.0.0.0"` and `$env:ALLOWED_ORIGINS="http://YOUR-LAN-IP:5173"`. Vite proxies sockets to the loopback Rust host. Firewall access must allow the client port. LAN/internet latency and additional browser engines have not been validated by the loopback Chromium suite.
 
@@ -25,12 +27,18 @@ npm run test:e2e
 
 `check` runs Rust formatting, clippy, simulation tests, strict TypeScript and the production client build. `test:e2e` starts real services and browser clients. CI uses the same commands. Commit both lockfiles.
 
+For the bounded 20-bot correctness scenario and timing sample, run `cargo test --release -p warshard-server practice_bots -- --nocapture`. This reports simulation/bot decision timing and a snapshot size; it does not measure rendered-client or hosting capacity.
+
+## Match rules
+
+Arenas end when an entire team falls; five minutes with both teams surviving is a draw. CTF ends at three captures or ten minutes; the higher capture score wins, with equal scores drawing. Walk onto the enemy flag to carry it, then return to your base while your own flag is home to capture. Touch your dropped flag to return it. Flags drop on death/disconnect and automatically return after fifteen seconds. CTF deaths respawn at base after eight seconds. An absent team forfeits after thirty seconds (both absent draws); an assigned roster that cannot load aborts after twenty seconds. These initial tuning values live in game data or the match rules, with no progression modifiers.
+
 ## Source boundaries
 
 - `crates/sim`: pure tick-driven combat, collision, content and lifecycle; no runtime, sockets, clock or persistence.
-- `crates/server`: `network.rs` owns WebSocket admission and limits; `room.rs` owns guest recovery, bounded commands, replaceable snapshots and scheduling.
+- `crates/server`: `network.rs` owns WebSocket admission and limits; `room.rs` owns guest recovery, bounded commands, replaceable snapshots and scheduling; `queue.rs` groups human tickets and allocates matches; `bots.rs` submits practice intents.
 - `client/src`: transport, input, prediction/interpolation, Babylon rendering and DOM UI. Presentation never decides damage.
-- `data/game.json`: authoritative classes, forms, abilities and map, validated by Rust and delivered to clients.
+- `data/game.json`: authoritative classes, forms, abilities, maps and playlists, validated by Rust and delivered to clients.
 - [Architecture](docs/architecture.md) and [decisions](docs/decisions): contracts, rationale, official research and limitations.
 
 Keep time in integer ticks, iteration stable, protocol versions explicit, and validation at cast start **and** completion. New effects require behavior tests. New wire fields require cross-language checks and integration validation. Do not add progression multipliers without a fairness design.
@@ -39,4 +47,4 @@ Keep time in integer ticks, iteration stable, protocol versions explicit, and va
 
 This is a local foundation, not an internet production service. Hosting needs TLS, explicit allowed Origins, abuse controls, authenticated admission, supervision and monitoring. Default bind is loopback. Guest capabilities are short-lived and are not account identities. Metrics: http://localhost:3001/metrics.
 
-Future profile services submit validated loadouts at admission; the match owns immutable combat stats. No database belongs in the tick loop. Accounts, gear, purchases, summons and more complex effects are deferred until needed. Production character fidelity and battleground capacity remain unproven.
+Future profile services submit validated loadouts at admission; the match owns immutable combat stats. No database belongs in the tick loop. Accounts, gear, purchases, summons and more complex effects are deferred until needed. The automated suite checks 20 connected transport clients and a 20-bot scenario, not twenty rendered browsers or production capacity. Production character fidelity, internet latency, low-end GPU budgets and 20v20/40v40 capacity remain unproven.

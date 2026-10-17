@@ -25,7 +25,7 @@ function observe(page: Page) {
         record.content = message.content;
         record.welcomeCount++;
       } else if (message.type === "state") record.state = message.state;
-      else record.errors.push(message.code);
+      else if (message.type === "error") record.errors.push(message.code);
     }),
   );
   return record;
@@ -34,7 +34,7 @@ type RecordState = ReturnType<typeof observe>;
 const own = (r: RecordState) => r.state?.players.find((p) => p.id === r.id);
 const rival = (r: RecordState) => r.state?.players.find((p) => p.id !== r.id);
 async function join(page: Page, room: string, classId: string) {
-  await page.goto("/");
+  await page.goto("/?direct=1");
   await page.locator(`[data-class="${classId}"]`).click();
   await page.locator("#room").fill(room);
   await page.getByRole("button", { name: "ENTER ARENA" }).click();
@@ -205,7 +205,7 @@ test("protocol rejects wrong versions and malformed admission", async ({
       }),
       await request({
         type: "join",
-        version: 1,
+        version: 2,
         room: "../bad",
         class_id: "briarwarden",
         resume: null,

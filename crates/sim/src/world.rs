@@ -1,5 +1,7 @@
 use crate::{geometry::Pos, *};
 use std::collections::{BTreeMap, VecDeque};
+mod rules;
+pub use rules::Rules;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
@@ -39,6 +41,8 @@ pub struct Player {
     inputs: VecDeque<Movement>,
     received_seq: u32,
     shield_until: u32,
+    root_stage: u8,
+    root_reset: u32,
 }
 #[derive(Clone, Debug)]
 struct Area {
@@ -58,9 +62,11 @@ pub struct World {
     round: u32,
     starts_at: u32,
     winner: Option<u32>,
+    pub rules: Rules,
 }
 impl World {
     pub fn new(content: Content) -> Self {
+        let rules = Rules::legacy(&content);
         Self {
             content,
             tick: 0,
@@ -71,6 +77,7 @@ impl World {
             round: 0,
             starts_at: 0,
             winner: None,
+            rules,
         }
     }
 
@@ -81,6 +88,9 @@ impl World {
         spawn: usize,
         team: u8,
     ) -> Result<(), &'static str> {
+        if team > 1 {
+            return Err("invalid_team");
+        }
         if self.players.contains_key(&id) {
             return Err("duplicate_player");
         }
@@ -103,6 +113,8 @@ impl World {
                     max_health: class.health,
                     shield: 0,
                     connected: true,
+                    bot: false,
+                    respawn_at: 0,
                     form: class.base_form.clone(),
                     form_until: 0,
                     root_until: 0,
@@ -117,16 +129,30 @@ impl World {
                     cooldowns: BTreeMap::new(),
                     ack: 0,
                     lockouts: BTreeMap::new(),
+                    mobility_until: 0,
                 },
                 cast: None,
                 inputs: VecDeque::new(),
                 received_seq: 0,
                 shield_until: 0,
+                root_stage: 0,
+                root_reset: 0,
+            },
+        );
+        self.rules.view.stats.insert(
+            id,
+            CombatStats {
+                class_id: class_id.into(),
+                team,
+                ..CombatStats::default()
             },
         );
         Ok(())
     }
     pub fn connected(&mut self, id: u32, connected: bool) {
+        if !connected {
+            self.drop_flags(id);
+        }
         if let Some(p) = self.players.get_mut(&id) {
             p.view.connected = connected;
             p.inputs.clear();
@@ -135,6 +161,7 @@ impl World {
         }
     }
     pub fn remove(&mut self, id: u32) {
+        self.drop_flags(id);
         self.players.remove(&id);
     }
 
@@ -298,9 +325,19 @@ impl World {
         if t.view.health == 0 {
             t.cast = None;
             t.inputs.clear();
+            if self.rules.config.kind == "ctf" {
+                t.view.respawn_at = self.tick + self.rules.config.respawn;
+            }
+            self.rules.view.stats.entry(target).or_default().deaths += 1;
+            self.rules.view.stats.entry(source).or_default().kills += 1;
         }
+        let died = t.view.health == 0;
+        self.rules.view.stats.entry(source).or_default().damage += effective;
         if let Some(s) = self.players.get_mut(&source) {
             s.private.energy = (s.private.energy + (effective + absorb) / 8).min(100);
+        }
+        if died {
+            self.drop_flags(target);
         }
     }
     fn resolve(&mut self, source: u32, a: &Ability, target: Option<u32>, point: Option<Pos>) {
@@ -338,7 +375,17 @@ impl World {
                 }
                 Effect::Root { duration } => {
                     let p = self.players.get_mut(&recipient).unwrap();
-                    p.view.root_until = p.view.root_until.max(self.tick + duration);
+                    if self.tick >= p.root_reset {
+                        p.root_stage = 0;
+                    }
+                    let reduced = if p.root_stage >= 3 {
+                        0
+                    } else {
+                        duration / (1 << p.root_stage)
+                    };
+                    p.root_stage = (p.root_stage + 1).min(3);
+                    p.root_reset = self.tick + 360;
+                    p.view.root_until = p.view.root_until.max(self.tick + reduced);
                 }
                 Effect::Slow { duration } => {
                     let p = self.players.get_mut(&recipient).unwrap();
@@ -373,10 +420,30 @@ impl World {
         self.winner = None;
         self.areas.clear();
         self.round += 1;
+        self.rules.view.ends_at = self.starts_at + self.rules.config.time_limit;
+        self.rules.view.scores = vec![0, 0];
+        self.rules.view.reason.clear();
+        self.rules.view.winner_team = None;
         for (index, p) in self.players.values_mut().enumerate() {
             p.view.health = p.view.max_health;
             p.view.shield = 0;
-            p.view.pos = self.content.arena.spawns[index % self.content.arena.spawns.len()];
+            let base = self.content.arena.spawns
+                [usize::from(p.view.team) % self.content.arena.spawns.len()];
+            let offset = if self.rules.config.team_size > 1 {
+                ((index / 2) as i32 - i32::from(self.rules.config.team_size) / 2) * 700
+            } else {
+                0
+            };
+            p.view.pos = Pos {
+                x: base.x,
+                z: base.z + offset,
+            };
+            if !self.content.arena.walkable(p.view.pos) {
+                p.view.pos = base;
+            }
+            p.view.respawn_at = 0;
+            p.root_stage = 0;
+            p.root_reset = 0;
             p.view.form = self.content.classes[&p.view.class_id].base_form.clone();
             p.view.form_until = 0;
             p.view.root_until = 0;
@@ -389,16 +456,17 @@ impl World {
             p.private.gcd_until = 0;
             p.private.cooldowns.clear();
             p.private.lockouts.clear();
+            p.private.mobility_until = 0;
         }
     }
     pub fn step(&mut self) {
         self.tick += 1;
-        let ready = self.players.len() >= 2 && self.players.values().all(|p| p.view.connected);
+        let ready = self.ready();
         match self.phase {
             Phase::Waiting if ready => self.start_countdown(),
             Phase::Countdown if !ready => self.phase = Phase::Waiting,
             Phase::Countdown if self.tick >= self.starts_at => self.phase = Phase::Active,
-            Phase::Finished if self.tick >= self.starts_at => {
+            Phase::Finished if self.rules.legacy && self.tick >= self.starts_at => {
                 if ready {
                     self.start_countdown();
                 } else {
@@ -489,20 +557,7 @@ impl World {
                 self.damage(area.view.owner, target, area.amount);
             }
         }
-        if active && (self.players.len() < 2 || self.players.values().any(|p| p.view.health <= 0)) {
-            self.phase = Phase::Finished;
-            self.starts_at = self.tick + 100;
-            self.winner = self
-                .players
-                .iter()
-                .find(|(_, p)| p.view.health > 0)
-                .map(|(id, _)| *id);
-            for p in self.players.values_mut() {
-                p.cast = None;
-                p.inputs.clear();
-            }
-            self.areas.clear();
-        }
+        self.step_rules();
     }
     pub fn snapshot(&self, recipient: u32) -> Snapshot {
         Snapshot {
@@ -526,6 +581,7 @@ impl World {
                 })
                 .collect(),
             areas: self.areas.iter().map(|a| a.view.clone()).collect(),
+            match_info: self.rules.view.clone(),
         }
     }
 }

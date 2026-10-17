@@ -1,0 +1,11 @@
+# ADR 0003: Playlists, queue admission and match rules
+
+Accepted for the battleground milestone, 2026-10-17. The user specifies arena teams of 1–5, battleground teams of 6 and 10 now, 20 and 40 later, and exactly two maps: one arena and one shared battleground. Solo practice uses explicitly labelled bots.
+
+Keep the existing Rust combat and WebSocket host. Add data-defined playlists referencing maps and rule kinds. A bounded in-process queue groups compatible human tickets FIFO, allocates independent match actors, and assigns balanced teams. Cancellation and disconnection remove tickets. Practice is a separate admission path filling a roster with bots; bots submit ordinary simulation intents, receive no hidden damage/range privileges and never count as human queue entrants. No rating, parties or distributed queue infrastructure yet.
+
+Separate objective/lifecycle rules from combat: arena team elimination, CTF flags/scores/respawns. Three captures or ten minutes ends CTF; equal scores draw. Arena time limit draws. Flags drop on death/disconnect, return after fifteen seconds, and capture only when the owner's flag is home. Respawn after eight seconds. A missing team forfeits after thirty seconds; if both teams are absent, the outcome is a draw. Finished queued matches remain at results, with explicit leave/requeue; the legacy room duel keeps automatic rematches for existing regression scenarios.
+
+Retain the current transport and full snapshots for this local milestone. Bandwidth, dense combat and rendered-client budgets need measurements before expanding capacity; transport choice alone does not establish a player limit.
+
+Critical review: do not reuse the duel's any-death victory condition, count bots as humans, let clients submit scores, or start normal queues with incomplete rosters. A simple queue is sufficient without population/rating evidence. Bot pathfinding and decisions belong outside combat; map collision and legal ability checks remain authoritative. Practice is for solo development, not evidence of multiplayer network capacity. 20v20/40v40 remain disabled until measured; no capacity claim follows from configuration alone. New crowd-control rules use root diminishing returns; slows do not inherit an arbitrary DR rule. Class mobility remains independent of form slots.
