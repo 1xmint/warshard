@@ -1,6 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import type { Content, ServerMessage, Snapshot } from "../client/src/protocol";
 
+test.beforeAll(() => console.info("[arena] worker ready"));
+
 function observe(page: Page) {
   const record: {
     state: Snapshot | null;
@@ -43,6 +45,7 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   browser,
 }, testInfo) => {
   test.setTimeout(180_000);
+  console.info("[duel] browser launched");
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
   });
@@ -56,6 +59,7 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   const room = `duel-${Date.now()}`;
   await join(a, room, "briarwarden");
   await join(b, room, "ashweaver");
+  console.info("[duel] both players admitted");
   await expect.poll(() => ra.state?.phase).toBe("active");
   await a.bringToFront();
   await a.keyboard.press("Tab");
@@ -91,6 +95,7 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
     })
     .toBeGreaterThanOrEqual(0);
   expect(own(ra)!.health).toBe(untouched);
+  console.info("[duel] movement, mouse targeting and interrupt verified");
   await b.keyboard.press("Digit5");
   await expect(b.locator("#notice")).toContainText("click the arena");
   const floor = await b.locator(".actor-label.enemy").boundingBox();
@@ -113,6 +118,7 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   expect(own(rb)!.health).toBe(oldHealth);
   expect(rb.state!.tick).toBeGreaterThan(oldTick);
   await expect.poll(() => ra.state?.areas.length, { timeout: 6000 }).toBe(0);
+  console.info("[duel] area and session recovery verified");
   await b.keyboard.press("Tab");
   // Effective combat earns energy; no test-only server state injection.
   await a.bringToFront();
@@ -144,6 +150,7 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   await expect(
     b.getByRole("button", { name: "1: Starthread", exact: true }),
   ).toBeVisible();
+  console.info("[duel] both earned transformations verified");
   await b.screenshot({ path: testInfo.outputPath("arena.png") });
   // Confirm expiry through authoritative states, including the independent class kit.
   await expect.poll(() => own(ra)?.form, { timeout: 16000 }).toBe("warden");
@@ -161,7 +168,9 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   expect(own(rb)!.health).toBe(1250);
   expect(own(ra)!.health).toBe(1500);
   expect(runtimeErrors).toEqual([]);
+  console.info("[duel] expiry, defeat and rematch verified");
   await context.close();
+  console.info("[duel] browser context closed");
 });
 
 test("protocol rejects wrong versions and malformed admission", async ({
