@@ -112,8 +112,11 @@ fi
 
 # Every later check needs a model call. Without authentication, stop here explicitly with exit
 # status 3 (inconclusive) instead of reporting each model-dependent check as a failure.
-auth="$(claude auth status --json 2>&1 < /dev/null)"
-save_log "auth status" "$auth"
+# stderr is kept apart, as in run_session, so a CLI warning cannot be parsed as the status.
+errfile="$(mktemp)"
+auth="$(claude auth status --json 2>"$errfile" < /dev/null)"
+autherr="$(cat "$errfile")"; rm -f "$errfile"
+save_log "auth status" "$auth"$'\n'"--- stderr ---"$'\n'"$autherr"
 logged_in="$(printf '%s' "$auth" | "$PYTHON" -I -c 'import json, sys; print(json.load(sys.stdin)["loggedIn"])' 2>/dev/null)"
 case "$logged_in" in
   True) ;;
@@ -122,7 +125,7 @@ case "$logged_in" in
     echo "      Set CLAUDE_CODE_OAUTH_TOKEN (from \`claude setup-token\`) or ANTHROPIC_API_KEY and rerun."
     exit 3;;
   *)
-    fail "authentication status readable" "$auth"; exit 1;;
+    fail "authentication status readable" "$auth $autherr"; exit 1;;
 esac
 
 # Fresh session: core and host notes injected exactly once
