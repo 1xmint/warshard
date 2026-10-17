@@ -90,8 +90,14 @@ test("arena bot finishes a real round, results return to menu and a new queue", 
   await page.goto("/");
   await choose(page, "1 vs 1");
   await page.locator('[data-class="ashweaver"]').click();
-  await page.locator("#practice").click();
+  await expect(page.locator("#practice")).toBeVisible();
+  await page.locator("#join").click();
+  await expect(page.locator("#queue-count")).toHaveText("1 / 2 humans");
+  await page.getByRole("button", { name: "Play now with bots" }).click();
   await expect.poll(() => record.state?.phase).toBe("active");
+  expect(record.state!.players).toHaveLength(2);
+  expect(record.state!.players.filter((p) => p.bot)).toHaveLength(1);
+  expect(record.state!.match_info.practice).toBe(true);
   await expect(page.locator("#results")).toBeVisible({ timeout: 45000 });
   await expect(page.locator("#result-title")).toHaveText("Defeat");
   await expect(page.locator("#result-roster")).toContainText("[BOT]");

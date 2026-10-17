@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:5173 → Play → choose a match size → select a class. **Queue match** waits for a full human roster; cancel returns to the menu. **Practice with labelled bots** immediately fills your chosen roster with bots for solo testing. Bots move, fight and pursue flags through ordinary validated intents; they are basic test opponents. Results return to the main menu for another match. Classes explains the kits; Settings changes render resolution; Equipment is visibly unavailable.
+Open http://localhost:5173 → Play → choose a match size → select a class. **Play solo with bots** starts immediately and fills your chosen roster with bots for solo testing: 1v1 gives you one opponent bot. **Queue for human opponents** waits for a full human roster; its waiting screen also offers **Play now with bots** to switch straight into practice, or cancel to return to the menu. Bots move, fight and pursue flags through ordinary validated intents; they are basic test opponents. Results return to the main menu for another match. Classes explains the kits; Settings changes render resolution; Equipment is visibly unavailable.
 
 The command starts Rust at 127.0.0.1:3001 and Vite at 127.0.0.1:5173. First compilation takes longer. Restart it after Rust or game-data changes. Reload attempts to recover the same guest slot for 30 seconds; disconnected characters remain vulnerable and drop carried flags. Explicit leave ends your slot. For direct two-tab combat regression testing, open `/?direct=1` and join the same named room; only this development path automatically rematches.
 
