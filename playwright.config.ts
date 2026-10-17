@@ -19,5 +19,8 @@ export default defineConfig({
     url: "http://127.0.0.1:5173/health",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
+    // The launcher owns separate child process groups on Unix; let it reap them
+    // before Playwright falls back to killing the parent group.
+    gracefulShutdown: { signal: "SIGTERM", timeout: 5000 },
   },
 });
