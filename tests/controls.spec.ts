@@ -29,6 +29,15 @@ for (const allowLock of [true, false]) {
             new DOMException("Blocked for fallback test", "NotAllowedError"),
           );
       });
+    await page.addInitScript(() => {
+      const native = HTMLCanvasElement.prototype.requestPointerLock;
+      HTMLCanvasElement.prototype.requestPointerLock = function () {
+        document.documentElement.dataset.lockRequests = String(
+          Number(document.documentElement.dataset.lockRequests ?? 0) + 1,
+        );
+        return native.call(this);
+      };
+    });
     let lastInput: Extract<ClientMessage, { type: "steer" }> | null = null;
     page.on("websocket", (socket) =>
       socket.on("framesent", ({ payload }) => {
@@ -40,6 +49,7 @@ for (const allowLock of [true, false]) {
     page.on("pageerror", (e) => errors.push(e.message));
     const room = `camera-${Date.now()}`;
     await page.goto("/?direct=1");
+    await page.locator('[data-class="ashweaver"]').click();
     await page.locator("#room").fill(room);
     await page.locator("#join").click();
     const opponent = await context.newPage();
@@ -131,14 +141,76 @@ for (const allowLock of [true, false]) {
     await page.mouse.up({ button: "left" });
     const stopped = await settledPosition();
     await page.mouse.up({ button: "right" });
-    await expect
-      .poll(() => page.evaluate(() => document.pointerLockElement))
-      .toBeNull();
-    expect(
-      await page
-        .locator("#arena")
-        .evaluate((el) => (el as HTMLElement).style.cursor),
-    ).not.toBe("none");
+    if (allowLock) {
+      await expect
+        .poll(() => page.evaluate(() => document.pointerLockElement?.id))
+        .toBe("arena");
+      const cursor = page.locator("#game-cursor");
+      await expect(cursor).toBeVisible();
+      const anchor = await cursor.boundingBox();
+      for (let n = 0; n < 3; n++) {
+        await page.mouse.down({ button: "right" });
+        await expect(cursor).toBeHidden();
+        await page.mouse.up({ button: "right" });
+        await expect(cursor).toBeVisible();
+        expect(await cursor.boundingBox()).toEqual(anchor);
+      }
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-lock-requests",
+        "1",
+      );
+      // Move the logical cursor using real relative mouse events, not DOM clicks.
+      const moveCursor = async (x: number, y: number) => {
+        await page.mouse.move(0, 0);
+        const at = (await cursor.boundingBox())!;
+        await page.mouse.move(x - at.x, y - at.y, { steps: 5 });
+        await expect
+          .poll(async () => (await cursor.boundingBox())!.x)
+          .toBeCloseTo(Math.floor(x), 0);
+        await expect
+          .poll(async () => (await cursor.boundingBox())!.y)
+          .toBeCloseTo(Math.floor(y), 0);
+      };
+      const virtualClick = async () => {
+        await page.mouse.down();
+        await page.mouse.up();
+      };
+      const hit = (await enemy.boundingBox())!;
+      await moveCursor(hit.x + hit.width / 2, hit.y + hit.height + 28);
+      await virtualClick();
+      await expect(page.locator("#target-frame")).toBeVisible();
+      const groundButton = page.getByRole("button", {
+        name: "5: Cinderfall",
+        exact: true,
+      });
+      const ability = (await groundButton.boundingBox())!;
+      await moveCursor(
+        ability.x + ability.width / 2,
+        ability.y + ability.height / 2,
+      );
+      await expect(page.locator(".cursor-tooltip")).toContainText("Cinderfall");
+      await virtualClick();
+      await expect(page.locator("#notice")).toContainText("click the arena");
+      const ownLabel = (await page
+        .locator(".actor-label:not(.enemy)")
+        .boundingBox())!;
+      await moveCursor(
+        ownLabel.x + ownLabel.width / 2,
+        ownLabel.y + ownLabel.height + 70,
+      );
+      await virtualClick();
+      await expect.poll(() => current().casting?.ability).toBe("rain");
+      await expect.poll(() => state!.areas.length).toBeGreaterThan(0);
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-lock-requests",
+        "1",
+      );
+    } else {
+      await expect
+        .poll(() => page.evaluate(() => document.pointerLockElement))
+        .toBeNull();
+      await expect(page.locator("#game-cursor")).toBeHidden();
+    }
     // Start the chord in the reverse order too; then simulate losing focus.
     await page.mouse.down({ button: "left" });
     await page.mouse.down({ button: "right" });
@@ -165,7 +237,7 @@ for (const allowLock of [true, false]) {
     await page.mouse.up({ button: "left" });
     await page.mouse.up({ button: "right" });
     if (allowLock) {
-      // Delay the browser request until after release; a late grant must immediately unlock.
+      // A grant arriving after Escape canceled capture must immediately unlock.
       await page.evaluate(() => {
         const canvas = document.querySelector<HTMLCanvasElement>("#arena")!;
         const native = canvas.requestPointerLock.bind(canvas);
@@ -174,6 +246,7 @@ for (const allowLock of [true, false]) {
             window.addEventListener(
               "finish-lock-request",
               () => {
+                canvas.requestPointerLock = native;
                 Promise.resolve(native())
                   .then(() => {
                     canvas.dataset.lateLockGranted = "true";
@@ -189,6 +262,7 @@ for (const allowLock of [true, false]) {
       });
       await page.mouse.down({ button: "right" });
       await page.mouse.up({ button: "right" });
+      await page.keyboard.press("Escape");
       await page.evaluate(
         () =>
           new Promise<void>((resolve) => {
@@ -210,6 +284,39 @@ for (const allowLock of [true, false]) {
           .locator("#arena")
           .evaluate((el) => (el as HTMLElement).style.cursor),
       ).not.toBe("none");
+    }
+    if (allowLock) {
+      await page.mouse.move(650, 650);
+      await page.mouse.down({ button: "right" });
+      await page.mouse.up({ button: "right" });
+      await expect(page.locator("#game-cursor")).toBeVisible();
+      const clickHud = async (selector: string) => {
+        await page.mouse.move(0, 0);
+        const cursor = (await page.locator("#game-cursor").boundingBox())!;
+        const button = (await page.locator(selector).boundingBox())!;
+        await page.mouse.move(
+          button.x + button.width / 2 - cursor.x,
+          button.y + button.height / 2 - cursor.y,
+        );
+        await page.mouse.down();
+        await page.mouse.up();
+      };
+      await clickHud("#soundless");
+      await expect(page.locator("#help")).toBeVisible();
+      await expect
+        .poll(() => page.evaluate(() => document.pointerLockElement))
+        .toBeNull();
+      await page.locator("#close-help").click();
+      await page.mouse.move(650, 650);
+      await page.mouse.down({ button: "right" });
+      await page.mouse.up({ button: "right" });
+      await expect(page.locator("#game-cursor")).toBeVisible();
+      await clickHud("#leave");
+      await expect(page.locator("#front")).toBeVisible();
+      await expect
+        .poll(() => page.evaluate(() => document.pointerLockElement))
+        .toBeNull();
+      await expect(page.locator("#game-cursor")).toBeHidden();
     }
     expect(errors).toEqual([]);
     await opponent.close();
