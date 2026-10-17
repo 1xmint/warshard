@@ -86,22 +86,23 @@ export class ArenaRenderer {
     this.placement = this.ring("placement", 5.4, "#e7c783");
     this.placement.position.y = 0.04;
     this.placement.setEnabled(false);
-    canvas.addEventListener("pointermove", (event) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const pick = this.scene.pick(
-        event.clientX - rect.left,
-        event.clientY - rect.top,
-        (m) => m === this.ground,
-      );
-      this.cursor = pick?.pickedPoint
-        ? {
-            x: Math.round(pick.pickedPoint.x * 1000),
-            z: Math.round(pick.pickedPoint.z * 1000),
-          }
-        : null;
-    });
     window.addEventListener("resize", () => this.resize());
     this.resize();
+  }
+  pointAt(clientX: number, clientY: number) {
+    this.scene.updateTransformMatrix();
+    const rect = this.canvas.getBoundingClientRect();
+    const pick = this.scene.pick(
+      clientX - rect.left,
+      clientY - rect.top,
+      (m) => m === this.ground,
+    );
+    this.cursor = pick?.pickedPoint
+      ? {
+          x: Math.round(pick.pickedPoint.x * 1000),
+          z: Math.round(pick.pickedPoint.z * 1000),
+        }
+      : null;
   }
   pickAt(clientX: number, clientY: number) {
     this.scene.updateTransformMatrix();

@@ -1,3 +1,4 @@
+import { GameCursor } from "./game-cursor";
 import type { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 
 /** Mouse state belongs to the canvas; UI clicks never start steering or movement. */
@@ -10,8 +11,9 @@ export class MouseControls {
   private combined = false;
   private pointer: number | null = null;
   private lockPending = false;
-  private hadLock = false;
-  private unlockRequested = false;
+  private lockWanted = false;
+  private cursor: GameCursor;
+  private uiPressed: HTMLButtonElement | null = null;
   private denied = false;
   private savedCursor: string | null = null;
   constructor(
@@ -20,17 +22,22 @@ export class MouseControls {
     private enabled: () => boolean,
     click: (x: number, y: number) => void,
     private lockUnavailable: () => void = () => {},
+    point: (x: number, y: number) => void = () => {},
   ) {
+    this.cursor = new GameCursor(point);
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     const begin = (e: MouseEvent) => {
       if (!this.enabled() || (e.button !== 0 && e.button !== 2)) return;
       e.preventDefault();
       if (!this.buttons) {
+        this.uiPressed =
+          this.locked() && e.button === 0 ? this.cursor.button() : null;
         this.start = { x: e.clientX, y: e.clientY };
         this.dragged = false;
         this.combined = false;
       }
       this.last = { x: e.clientX, y: e.clientY };
+      if (!this.locked()) this.cursor.set(e.clientX, e.clientY);
       const wasRight = (this.buttons & 2) !== 0;
       this.buttons = e.buttons & 3;
       this.combined ||= this.buttons === 3;
@@ -38,9 +45,15 @@ export class MouseControls {
         this.faceCamera();
         if (!wasRight) this.lock();
       }
+      this.showCursor();
     };
     canvas.addEventListener("pointerdown", (e) => {
-      if (!this.enabled() || (e.button !== 0 && e.button !== 2)) return;
+      if (
+        this.locked() ||
+        !this.enabled() ||
+        (e.button !== 0 && e.button !== 2)
+      )
+        return;
       this.pointer = e.pointerId;
       canvas.setPointerCapture(e.pointerId);
       begin(e);
@@ -48,12 +61,19 @@ export class MouseControls {
     canvas.addEventListener("mousedown", begin);
 
     const move = (e: MouseEvent) => {
-      if (!this.buttons || !this.enabled()) {
+      if (!this.enabled()) {
         this.release();
         return;
       }
-      if (!(e.buttons & 3)) {
-        this.release();
+      if (!this.locked()) this.cursor.set(e.clientX, e.clientY);
+      if (!this.buttons || !(e.buttons & 3)) {
+        this.stopDrag();
+        if (this.locked())
+          this.cursor.set(
+            this.cursor.x + e.movementX,
+            this.cursor.y + e.movementY,
+          );
+        this.showCursor();
         return;
       }
       const wasRight = (this.buttons & 2) !== 0;
@@ -73,7 +93,7 @@ export class MouseControls {
           : Math.hypot(e.clientX - this.start.x, e.clientY - this.start.y) > 4
       )
         this.dragged = true;
-      if (!this.dragged) return;
+      if (!this.dragged || this.uiPressed) return;
       this.camera.alpha -= dx * 0.005;
       this.camera.beta = Math.max(
         0.25,
@@ -96,10 +116,17 @@ export class MouseControls {
         this.buttons === 1 &&
         !this.dragged &&
         !this.combined;
+      const button = this.uiPressed;
       this.buttons = e.buttons & 3;
-      if (!(this.buttons & 2)) this.unlock();
-      if (!this.buttons) this.release();
-      if (select) click(e.clientX, e.clientY);
+      if (!this.buttons) this.stopDrag();
+      this.showCursor();
+      if (select) {
+        if (button) {
+          if (button === this.cursor.button() && !button.disabled)
+            button.click();
+        } else if (this.locked()) click(this.cursor.x, this.cursor.y);
+        else click(e.clientX, e.clientY);
+      }
     };
     canvas.addEventListener("pointerup", (e) => {
       if (document.pointerLockElement !== canvas) end(e);
@@ -114,17 +141,24 @@ export class MouseControls {
         this.release();
     });
     document.addEventListener("pointerlockchange", () => {
-      const locked = document.pointerLockElement === canvas;
-      if (locked) {
-        this.hadLock = true;
-        this.unlockRequested = false;
-        if (!(this.buttons & 2) || !this.enabled()) this.unlock();
-      } else if (this.hadLock) {
-        this.hadLock = false;
-        if (!this.unlockRequested) this.release(); // Escape/browser cancellation must stop autorun.
-        this.unlockRequested = false;
-      }
+      if (this.locked()) {
+        // A grant can arrive after Escape, blur or leaving the match.
+        if (!this.lockWanted || !this.enabled()) this.release();
+        else this.showCursor();
+      } else this.release();
     });
+    // Locked native clicks carry the frozen OS coordinates. Only the logical
+    // cursor above may activate HUD buttons or pick the scene.
+    canvas.addEventListener(
+      "click",
+      (e) => {
+        if (this.locked()) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+      },
+      true,
+    );
     document.addEventListener("pointerlockerror", () => this.lockFailed());
     window.addEventListener("keydown", (e) => {
       if (e.code === "Escape") this.release();
@@ -152,6 +186,7 @@ export class MouseControls {
       return;
     }
     this.lockPending = true;
+    this.lockWanted = true;
     this.savedCursor = this.canvas.style.cursor;
     this.canvas.style.cursor = "none";
     try {
@@ -166,22 +201,30 @@ export class MouseControls {
       this.lockFailed();
     }
   }
+  private locked() {
+    return document.pointerLockElement === this.canvas;
+  }
+  private showCursor() {
+    this.cursor.show(this.locked() && !this.buttons && this.enabled());
+  }
+  private stopDrag() {
+    this.buttons = 0;
+    this.uiPressed = null;
+    if (this.pointer !== null && this.canvas.hasPointerCapture(this.pointer))
+      this.canvas.releasePointerCapture(this.pointer);
+    this.pointer = null;
+  }
   private restoreCursor() {
     if (this.savedCursor !== null) this.canvas.style.cursor = this.savedCursor;
     this.savedCursor = null;
   }
   private lockFailed() {
+    this.lockWanted = false;
     this.restoreCursor();
+    this.cursor.show(false);
     if (!this.denied) {
       this.denied = true;
       this.lockUnavailable();
-    }
-  }
-  private unlock() {
-    this.restoreCursor();
-    if (document.pointerLockElement === this.canvas) {
-      this.unlockRequested = true;
-      document.exitPointerLock();
     }
   }
   private faceCamera() {
@@ -189,11 +232,11 @@ export class MouseControls {
     this.facing = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   }
   release() {
-    this.buttons = 0;
-    this.unlock();
-    if (this.pointer !== null && this.canvas.hasPointerCapture(this.pointer))
-      this.canvas.releasePointerCapture(this.pointer);
-    this.pointer = null;
+    this.lockWanted = false;
+    this.stopDrag();
+    this.cursor.show(false);
+    this.restoreCursor();
+    if (this.locked()) document.exitPointerLock();
   }
   reset(facing: number) {
     this.release();
@@ -201,7 +244,8 @@ export class MouseControls {
     this.camera.alpha = -Math.PI / 2 - this.facing;
   }
   movement(strafe: number, forward: number) {
-    if ((this.buttons & 3) === 3 && this.enabled()) forward = 1;
+    if ((this.buttons & 3) === 3 && !this.uiPressed && this.enabled())
+      forward = 1;
     const sin = Math.sin(this.facing),
       cos = Math.cos(this.facing);
     const dx = strafe * cos + forward * sin,

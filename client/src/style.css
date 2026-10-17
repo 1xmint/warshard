@@ -36,6 +36,44 @@ button {
   display: block;
   outline: none;
 }
+.game-cursor,
+.cursor-tooltip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 100;
+}
+.game-cursor {
+  left: 0;
+  top: 0;
+  width: 18px;
+  height: 25px;
+  background: #f3e6c8;
+  clip-path: polygon(
+    0 0,
+    100% 65%,
+    55% 66%,
+    77% 100%,
+    57% 100%,
+    36% 70%,
+    0 100%
+  );
+  filter: drop-shadow(1px 1px 1px #000);
+}
+.cursor-tooltip {
+  width: max-content;
+  max-width: 320px;
+  padding: 10px 12px;
+  border: 1px solid var(--gold);
+  background: #0c161df5;
+  color: #f3e6c8;
+  white-space: pre-line;
+  font-size: 12px;
+  line-height: 1.5;
+}
+button.mouse-hover {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+}
 .hidden {
   display: none !important;
 }

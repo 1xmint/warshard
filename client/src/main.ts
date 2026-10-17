@@ -30,6 +30,7 @@ const controls = new MouseControls(
     ),
   (x, y) => renderer.pickAt(x, y),
   () => notice("Mouse lock is unavailable here; camera drag still works."),
+  (x, y) => renderer.pointAt(x, y),
 );
 const prediction = new Prediction();
 const keys = new Set<string>();
@@ -250,6 +251,7 @@ net.onQueue = (playlist, waiting, needed) =>
   menus.queued(playlist, waiting, needed);
 net.onStatus = (text) => {
   status = text;
+  if (text !== "CONNECTED") controls.release();
   $("#connection").textContent = text;
   $("#light").classList.toggle("online", text === "CONNECTED");
   if (text === "RECONNECTING") {
