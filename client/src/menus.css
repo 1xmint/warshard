@@ -205,6 +205,18 @@ select {
 #lobby {
   max-height: 85vh;
 }
+#practice,
+#queue-bots {
+  background: #c9b47f;
+  color: #14232b;
+  font-size: 15px;
+  text-align: center;
+}
+.play-choice {
+  color: #b6c5b9;
+  font-size: 11px;
+  margin: 10px 0 16px;
+}
 #results {
   z-index: 9;
 }

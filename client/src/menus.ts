@@ -18,7 +18,7 @@ export class Menus {
       "beforeend",
       `<section id="front" class="front-menu"><span class="eyebrow">WARSHARD · EARLY PLAYABLE</span><h1>Every shard<br>has a battle.</h1><p>Steel, spell, and the ground between.<br>Enter the court or carry your colors through Riftwood.</p><div class="front-actions"><button id="play">Play <span>↗</span></button><button id="classes">Classes <span>Ⅱ</span></button><button disabled>Equipment <small>COMING LATER</small></button><button id="settings">Settings <span>⚙</span></button></div><small class="build-note">Guest play · Original 3D fantasy PvP</small></section>
     <section id="modes" class="menu-panel hidden"><span class="eyebrow">CHOOSE YOUR BATTLE</span><h1>A place to make your stand.</h1><div id="playlist-grid"></div><button id="modes-back" class="text-button">← Main menu</button></section>
-    <section id="queue-panel" class="menu-panel hidden"><span class="eyebrow">SERVER MATCHMAKING</span><h1>Gathering the warband.</h1><p id="queue-name"></p><strong id="queue-count">Connecting…</strong><p id="queue-error" role="alert"></p><p>Human queues start with full, balanced rosters.<br>Practice is a separate mode with explicitly labelled bots.</p><button id="cancel-queue">Cancel queue</button></section>
+    <section id="queue-panel" class="menu-panel hidden"><span class="eyebrow">SERVER MATCHMAKING</span><h1>Gathering the warband.</h1><p id="queue-name"></p><strong id="queue-count">Connecting…</strong><p id="queue-error" role="alert"></p><p>Waiting for human opponents?<br>Start a practice match now. Bots fill the other slots.</p><button id="queue-bots">Play now with bots</button><button id="cancel-queue">Cancel queue</button></section>
     <section id="results" class="menu-panel hidden"><span class="eyebrow">MATCH COMPLETE</span><h1 id="result-title"></h1><p id="result-reason"></p><div id="result-roster"></div><button id="results-menu">Return to main menu</button></section>
     <dialog id="settings-dialog"><button id="settings-close">×</button><span class="eyebrow">FIELD SETTINGS</span><h2>Make the battlefield yours.</h2><label>Render quality <select id="render-quality"><option value="1">Standard</option><option value="1.5">Performance</option><option value="2">Low resolution</option></select></label><p>WASD · Move<br>Tab or click · Target<br>1–5 · Current kit<br>Q · Class mobility<br>R · Ascension<br>Escape · Cancel placement / clear target</p></dialog>
     <dialog id="classes-dialog"><button id="classes-close">×</button><span class="eyebrow">TWO CALLINGS</span><h2>Steel and spell.</h2><div id="class-inspect"></div></dialog>`,
@@ -41,6 +41,7 @@ export class Menus {
       this.actions.leave();
       this.main();
     };
+    node("queue-bots").onclick = () => this.actions.queue(this.playlist, true);
     node("results-menu").onclick = () => {
       this.actions.leave();
       this.main();
@@ -74,9 +75,13 @@ export class Menus {
       this.actions.quality(Number(quality.value));
     };
     this.actions.quality(Number(quality.value));
+    node("join").insertAdjacentHTML(
+      "beforebegin",
+      '<button type="button" id="practice" class="practice-button">Play solo with bots →</button><p class="play-choice">Start immediately with bots, or queue below for human opponents.</p>',
+    );
     node("lobby").insertAdjacentHTML(
       "beforeend",
-      '<button id="practice" class="practice-button">Practice with labelled bots</button><button id="class-back" class="text-button">← Choose another battle</button>',
+      '<button id="class-back" class="text-button">← Choose another battle</button>',
     );
     node("practice").onclick = () => this.actions.queue(this.playlist, true);
     node("class-back").onclick = () => {
@@ -87,6 +92,7 @@ export class Menus {
       this.screen(null);
       node("lobby").classList.remove("hidden");
       node("practice").classList.add("hidden");
+      document.querySelector(".play-choice")!.classList.add("hidden");
       node("class-back").classList.add("hidden");
     } else this.main();
   }
@@ -103,7 +109,7 @@ export class Menus {
     this.screen(null);
     node("lobby").classList.remove("hidden");
     node("room").closest("label")!.classList.add("hidden");
-    node("join").textContent = "QUEUE MATCH →";
+    node("join").textContent = "Queue for human opponents →";
     node("lobby-error").textContent = "";
     node("join").removeAttribute("disabled");
     node("lobby").querySelector(".eyebrow")!.textContent =
