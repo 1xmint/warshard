@@ -426,8 +426,8 @@ def place_order(srv, name, phone="555-0100", hidden=None, timeout=10):
 # Wording that commits to fulfilling an order, and wording that says it is not settled yet.
 PROMISE = (r"\b(we.ll|we will|will)\s+(still\s+)?(have it|be) ready|\bis ready (at|for)\b|\bready for (you|pickup)\b|"
            r"\b(is|are) (placed|confirmed|booked|in)\b|\bconfirmed for\b|\bsee you (at|on|then)\b")
-UNSETTLED = (r"pending|unconfirmed|not (yet )?(been )?confirmed|(couldn.t|could not|cannot|can.t|unable to) (yet )?confirm|"
-             r"awaiting confirmation|\b(call|contact|text) (you|us) to confirm\b|\bwill (call|contact) you\b")
+UNSETTLED = (r"pending|unconfirmed|(not|n.t) (yet )?(been )?confirmed|(couldn.t|could not|cannot|can.t|unable to) (yet )?confirm|"
+             r"awaiting confirmation|\b(call|contact|text) (you|us) to confirm\b|\b(will|we.ll) (call|contact) you\b")
 
 
 def classify_text_failure(srv, notifier, name):
