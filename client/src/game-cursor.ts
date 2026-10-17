@@ -5,6 +5,8 @@ export class GameCursor {
   private arrow = document.createElement("div");
   private tooltip = document.createElement("div");
   private hovered: HTMLButtonElement | null = null;
+  private visible = false;
+  private dirty = true;
 
   constructor(private point: (x: number, y: number) => void) {
     this.arrow.id = "game-cursor";
@@ -18,7 +20,7 @@ export class GameCursor {
   set(x: number, y: number) {
     this.x = Math.max(0, Math.min(innerWidth - 1, x));
     this.y = Math.max(0, Math.min(innerHeight - 1, y));
-    this.point(this.x, this.y);
+    this.dirty = true;
   }
 
   button() {
@@ -26,6 +28,16 @@ export class GameCursor {
   }
 
   show(visible: boolean) {
+    if (this.visible !== visible) this.dirty = true;
+    this.visible = visible;
+  }
+
+  /** Coalesce high-frequency mouse events into the existing display frame. */
+  render() {
+    if (!this.dirty) return;
+    this.dirty = false;
+    const visible = this.visible;
+    this.point(this.x, this.y);
     this.arrow.classList.toggle("hidden", !visible);
     this.arrow.style.transform = `translate(${this.x}px, ${this.y}px)`;
     const hovered = visible ? this.button() : null;
@@ -35,9 +47,11 @@ export class GameCursor {
       this.hovered = hovered;
     }
     const title = hovered?.title ?? "";
-    this.tooltip.textContent = title;
+    if (this.tooltip.textContent !== title) this.tooltip.textContent = title;
     this.tooltip.classList.toggle("hidden", !title);
-    this.tooltip.style.left = `${Math.max(8, Math.min(innerWidth - 328, this.x + 20))}px`;
-    this.tooltip.style.top = `${Math.max(8, this.y - this.tooltip.offsetHeight - 12)}px`;
+    if (title) {
+      this.tooltip.style.left = `${Math.max(8, Math.min(innerWidth - 328, this.x + 20))}px`;
+      this.tooltip.style.top = `${Math.max(8, this.y - this.tooltip.offsetHeight - 12)}px`;
+    }
   }
 }

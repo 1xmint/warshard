@@ -510,6 +510,7 @@ setInterval(() => {
     prediction.pending = [];
 }, 50);
 renderer.engine.runRenderLoop(() => {
+  controls.renderCursor();
   renderer.render(
     net.id,
     status === "CONNECTED" ? prediction.pos : null,
