@@ -1,0 +1,13 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          { "type": "command", "command": "cat \"${CLAUDE_PLUGIN_ROOT}/core.md\"", "timeout": 10 },
+          { "type": "command", "command": "cat \"${CLAUDE_PLUGIN_ROOT}/hosts/claude-code.md\"", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

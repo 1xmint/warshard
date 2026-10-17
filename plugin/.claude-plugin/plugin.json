@@ -1,0 +1,8 @@
+{
+  "name": "keel",
+  "version": "0.1.0",
+  "description": "Helps your coding agent understand and protect what you want, make sound technical decisions, and prove the result works",
+  "author": { "name": "1xmint" },
+  "repository": "https://github.com/1xmint/keel",
+  "keywords": ["engineering", "judgment", "nontechnical", "vibe-coding"]
+}

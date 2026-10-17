@@ -1,0 +1,12 @@
+{
+  "name": "keel",
+  "owner": { "name": "1xmint" },
+  "description": "Keel: senior engineering judgment for people building software with a coding agent",
+  "plugins": [
+    {
+      "name": "keel",
+      "source": "./plugin",
+      "description": "Helps your coding agent understand and protect what you want, make sound technical decisions, and prove the result works"
+    }
+  ]
+}

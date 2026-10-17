@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code@2.1.301
+      - run: claude plugin validate --strict ./plugin
+      - run: claude plugin validate --strict .
+      - run: python3 scripts/check-hook-shells.py plugin
+      - name: Lifecycle script stops only at the expected unauthenticated point
+        # CI has no model credentials. Install must pass, then the script must stop explicitly
+        # (exit 3, "STOP  not authenticated") with no failures. Anything else fails this job.
+        # Authenticated Windows acceptance is a separate, manual step documented in the PR.
+        run: |
+          status=0; scripts/check-lifecycle.sh > lifecycle.txt 2>&1 || status=$?
+          cat lifecycle.txt
+          if [ "$status" -ne 3 ] || ! grep -q '^PASS  install from' lifecycle.txt \
+             || ! grep -q '^STOP  not authenticated' lifecycle.txt || grep -q '^FAIL' lifecycle.txt; then
+            echo "Unexpected lifecycle result (exit $status)"; exit 1
+          fi
+      - name: Session start delivers the guidance only while installed (no credentials needed)
+        env:
+          CLAUDE_CONFIG_DIR: ${{ github.workspace }}/../claude-config
+        run: |
+          claude plugin install keel --marketplace "$GITHUB_WORKSPACE" -y
+          python3 scripts/check-session-hooks.py present
+          claude plugin uninstall keel@keel
+          python3 scripts/check-session-hooks.py absent
+
+  windows:
+    # Real Windows, no model access: install from this checkout, run the installed plugin's hook
+    # commands through Git Bash, Windows PowerShell, and PowerShell 7, and check that a real session
+    # receives the guidance when installed and nothing once disabled or uninstalled.
+    runs-on: windows-latest
+    steps:
+      - name: Use a throwaway Claude Code configuration
+        shell: bash
+        run: echo "CLAUDE_CONFIG_DIR=$(cygpath -m "$RUNNER_TEMP")/claude-config" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code@2.1.301
+      - run: claude --version
+      - run: claude plugin validate --strict ./plugin
+      - name: Install from this checkout
+        shell: bash
+        run: claude plugin install keel --marketplace "$GITHUB_WORKSPACE" -y
+      - name: Installed hook commands run in each Windows shell
+        shell: bash
+        run: |
+          root="$(find "$CLAUDE_CONFIG_DIR/plugins/cache" -path '*keel*' -name plugin.json -path '*.claude-plugin*' | head -n 1 | xargs dirname | xargs dirname)"
+          echo "installed plugin root: $root"
+          python scripts/check-hook-shells.py "$root"
+      - name: Lifecycle script stops only at the expected unauthenticated point
+        # CI has no model credentials. Install must pass, then the script must stop explicitly
+        # (exit 3, "STOP  not authenticated") with no failures. Anything else fails this job.
+        # Authenticated Windows acceptance is a separate, manual step documented in the PR.
+        shell: bash
+        run: |
+          status=0; scripts/check-lifecycle.sh > lifecycle.txt 2>&1 || status=$?
+          cat lifecycle.txt
+          if [ "$status" -ne 3 ] || ! grep -q '^PASS  install from' lifecycle.txt \
+             || ! grep -q '^STOP  not authenticated' lifecycle.txt || grep -q '^FAIL' lifecycle.txt; then
+            echo "Unexpected lifecycle result (exit $status)"; exit 1
+          fi
+      - name: Session start delivers the guidance (no credentials needed)
+        shell: bash
+        run: python scripts/check-session-hooks.py present
+      - name: Disabled plugin delivers nothing
+        shell: bash
+        run: |
+          claude plugin disable keel@keel
+          python scripts/check-session-hooks.py absent
+          claude plugin enable keel@keel
+      - name: Uninstalled plugin delivers nothing
+        shell: bash
+        run: |
+          claude plugin uninstall keel@keel
+          if grep -q '"keel@keel"' "$CLAUDE_CONFIG_DIR/plugins/installed_plugins.json"; then
+            echo "keel@keel is still recorded as installed"; exit 1
+          fi
+          python scripts/check-session-hooks.py absent
