@@ -82,7 +82,29 @@ pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, u32>) {
         let (dx, dz) = direction(&world.content.arena, p.pos, goal);
         let seq = sequences.entry(id).or_default();
         *seq += 1;
-        let _ = world.input(id, *seq, dx, dz);
+        // Pursue at half speed so humans can open a gap; flag runners retain normal
+        // navigation speed. Both still use ordinary validated steering and collisions.
+        let scale = match (objective_role, dx != 0 && dz != 0) {
+            (true, true) => 707,
+            (true, false) => 1000,
+            (false, true) => 353,
+            (false, false) => 500,
+        };
+        let facing = if dx == 0 && dz == 0 {
+            p.facing
+        } else {
+            (f64::from(dx)
+                .atan2(f64::from(dz))
+                .rem_euclid(std::f64::consts::TAU)
+                * 1000.0) as u16
+        };
+        let _ = world.steer(
+            id,
+            *seq,
+            i16::from(dx) * scale,
+            i16::from(dz) * scale,
+            facing,
+        );
     }
 }
 fn direction(arena: &Arena, from: Pos, goal: Pos) -> (i8, i8) {
@@ -145,6 +167,38 @@ fn direction(arena: &Arena, from: Pos, goal: Pos) -> (i8, i8) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn human_can_outpace_pursuing_bot_and_roots_still_stop_it() {
+        let mut world = World::new(Content::load().unwrap());
+        world.add(1, "briarwarden", 0, 0).unwrap();
+        world.add(2, "briarwarden", 1, 1).unwrap();
+        world.players.get_mut(&1).unwrap().view.bot = true;
+        for _ in 0..61 {
+            world.step();
+        }
+        let bot_start = world.players[&1].view.pos;
+        let human_start = world.players[&2].view.pos;
+        let mut sequences = BTreeMap::new();
+        for seq in 1..=20 {
+            update(&mut world, &mut sequences);
+            world.input(2, seq, 1, 0).unwrap();
+            world.step();
+            assert_eq!(world.players[&1].view.pos.x, bot_start.x + seq as i32 * 125);
+            assert_eq!(
+                world.players[&2].view.pos.x,
+                human_start.x + seq as i32 * 250
+            );
+        }
+        let bot = world.players[&1].view.pos;
+        let human = world.players[&2].view.pos;
+        assert!(human.distance_sq(bot) > human_start.distance_sq(bot_start));
+        world.players.get_mut(&1).unwrap().view.root_until = world.tick + 10;
+        for _ in 0..5 {
+            update(&mut world, &mut sequences);
+            world.step();
+            assert_eq!(world.players[&1].view.pos, bot);
+        }
+    }
     #[test]
     fn easy_bot_uses_slow_basic_attacks_without_interrupts_or_ascension() {
         let mut world = World::new(Content::load().unwrap());
