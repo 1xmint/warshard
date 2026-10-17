@@ -38,7 +38,8 @@ export class ArenaRenderer {
   private frames: { state: Snapshot; at: number }[] = [];
   private ground: Mesh;
   private court: TransformNode | null = null;
-  private arena: Arena = initialContent.arena;
+  private arena: Arena = initialContent.maps.shattered_court;
+  private flagMeshes = new Map<number, TransformNode>();
   onPick: (id: number | null, point: Pos | null) => void = () => {};
   cursor: Pos | null = null;
 
@@ -308,6 +309,8 @@ export class ArenaRenderer {
       this.arena = content.arena;
       this.buildCourt(this.arena);
     }
+    for (const flag of this.flagMeshes.values()) flag.dispose(false);
+    this.flagMeshes.clear();
   }
   receive(state: Snapshot, reset: boolean) {
     if (reset) {
@@ -495,6 +498,51 @@ export class ArenaRenderer {
     const latest = this.frames.at(-1)?.state;
     const now = performance.now();
     if (latest && this.content) {
+      if (latest.match_info.kind === "ctf") {
+        const local = latest.players.find((p) => p.id === localId);
+        if (local) {
+          this.camera.target.x +=
+            (local.pos.x / 1000 - this.camera.target.x) * 0.08;
+          this.camera.target.z +=
+            (local.pos.z / 1000 - this.camera.target.z) * 0.08;
+        }
+      } else this.camera.target.setAll(0);
+      for (const flag of latest.match_info.flags) {
+        let root = this.flagMeshes.get(flag.team);
+        if (!root) {
+          root = new TransformNode(`flag-${flag.team}`, this.scene);
+          this.cylinder("flagpole", 0.08, 3, 0, 1.5, 0, "#ddcfab", root);
+          const banner = this.box(
+            "team-standard",
+            1.1,
+            0.85,
+            0.07,
+            0.52,
+            2.45,
+            0,
+            flag.team === 0 ? "#55bca3" : "#d18d6e",
+            root,
+          );
+          banner.material = this.material(
+            flag.team === 0 ? "#55bca3" : "#d18d6e",
+            true,
+          );
+          const marker = this.ring(
+            "flag-marker",
+            1.6,
+            flag.team === 0 ? "#55bca3" : "#d18d6e",
+            0.08,
+          );
+          marker.parent = root;
+          marker.position.y = 0.15;
+          this.flagMeshes.set(flag.team, root);
+        }
+        root.position.set(
+          flag.pos.x / 1000,
+          flag.carrier !== null ? 0.6 : 0,
+          flag.pos.z / 1000,
+        );
+      }
       const at = now - 100;
       const before = this.frames.findLast((f) => f.at <= at) ?? this.frames[0];
       const after = this.frames.find((f) => f.at > at) ?? this.frames.at(-1)!;
@@ -576,7 +624,10 @@ export class ArenaRenderer {
           p.team !== latest.players.find((q) => q.id === localId)?.team,
         );
         const name = this.content.classes[p.class_id].name;
-        actor.label.innerHTML = `${name}${p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%"></i></span>${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
+        const carrying = latest.match_info.flags.some(
+          (f) => f.carrier === p.id,
+        );
+        actor.label.innerHTML = `${name} #${p.id}${p.bot ? " [BOT]" : p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%;background:${p.team === 0 ? "#6ad9bb" : "#e49b73"}"></i></span>${carrying ? '<b class="flag-carrier">⚑ FLAG CARRIER</b>' : ""}${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
       }
       for (const [id, actor] of this.actors)
         if (!latest.players.some((p) => p.id === id)) {

@@ -1,6 +1,9 @@
+import { updateObjectives } from "./objectives";
 import "./style.css";
+import "./menus.css";
 import { ArenaRenderer } from "./renderer";
 import { Connection } from "./network";
+import { Menus } from "./menus";
 import { Prediction } from "./movement";
 import type { Ability, PlayerView, Snapshot } from "./protocol";
 
@@ -27,7 +30,28 @@ let noticeUntil = 0;
 let stateAt = 0;
 let roomName = "";
 const help = $<HTMLDialogElement>("#help");
+const menus = new Menus({
+  queue: (playlist, practice) => {
+    $("#lobby-error").textContent = "";
+    menus.queueing(playlist);
+    net.queue(playlist, selectedClass, practice);
+  },
+  leave: () => $("#leave").click(),
+  quality: (scale) => {
+    renderer.engine.setHardwareScalingLevel(scale);
+    renderer.engine.resize();
+  },
+});
+document.body.insertAdjacentHTML(
+  "beforeend",
+  '<aside id="battle-map" class="battle-map hidden"></aside><section id="objectives" class="objective-hud hidden"><strong id="score"></strong><span id="match-clock"></span><div id="flag-status"></div></section><button id="mobility" class="mobility-button hidden">Q · Mobility</button>',
+);
+$("#mobility").onclick = () =>
+  net.send({ type: "mobility", target: selectedTarget });
 const errors: Record<string, string> = {
+  rooted: "You cannot use mobility while rooted.",
+  mobility_cooldown: "Your mobility ability is recharging.",
+  no_path: "Terrain blocks that movement.",
   select_target: "Select an enemy first.",
   invalid_target: "Choose a living enemy.",
   out_of_range: "Target is out of range.",
@@ -38,12 +62,13 @@ const errors: Record<string, string> = {
   resource: "Not enough focus.",
   already_casting: "Already casting. Move to cancel.",
   round_not_active: "Wait for the round to begin.",
-  dead: "You have fallen. A new round starts shortly.",
+  dead: "You have fallen. Check your respawn timer or match results.",
   energy: "Reach 100% energy to ascend.",
   already_transformed: "Your transformation is already active.",
   room_full:
     "This arena is full. Choose another channel or resume your existing tab.",
-  session_expired: "Your guest session expired. Joining a fresh slot…",
+  session_expired:
+    "Your guest session expired. Return to the menu and queue again.",
   connection_lost: "Connection lost. Return to the lobby and try again.",
   protocol_version:
     "Client/server versions differ. Reload after updating both.",
@@ -116,10 +141,19 @@ renderer.onPick = (id, point) => {
   } else if (id !== null) target(id);
 };
 function focusedInput(event: KeyboardEvent) {
-  return event.target instanceof HTMLInputElement || help.open;
+  return (
+    event.target instanceof HTMLInputElement ||
+    !!document.querySelector("dialog[open]")
+  );
 }
 window.addEventListener("keydown", (event) => {
-  if (focusedInput(event)) return;
+  if (
+    focusedInput(event) ||
+    ["front", "modes", "queue-panel", "results", "lobby"].some(
+      (id) => !$("#" + id).classList.contains("hidden"),
+    )
+  )
+    return;
   if (["KeyW", "KeyA", "KeyS", "KeyD", "Tab", "Space"].includes(event.code))
     event.preventDefault();
   keys.add(event.code);
@@ -138,6 +172,8 @@ window.addEventListener("keydown", (event) => {
   } else if (/^Digit[1-5]$/.test(event.code))
     cast(Number(event.code.slice(-1)) - 1);
   else if (event.code === "KeyR") ascend();
+  else if (event.code === "KeyQ")
+    net.send({ type: "mobility", target: selectedTarget });
   else if (event.code === "Escape") {
     if (placement !== null) {
       cancelPlacement();
@@ -168,16 +204,24 @@ $("#join-form").onsubmit = (event) => {
   roomName = $<HTMLInputElement>("#room").value.trim();
   $("#lobby-error").textContent = "";
   $<HTMLButtonElement>("#join").disabled = true;
-  net.join(roomName, selectedClass);
+  if (location.search.includes("direct=1")) net.join(roomName, selectedClass);
+  else {
+    menus.queueing(menus.playlist);
+    net.queue(menus.playlist, selectedClass, false);
+  }
 };
 $("#leave").onclick = () => {
-  net.close();
+  net.send({ type: "leave_match" });
+  net.cancelQueue();
   sessionStorage.removeItem("warshard.join");
   keys.clear();
   cancelPlacement();
-  $("#lobby").classList.remove("hidden");
+  menus.main();
   $<HTMLButtonElement>("#join").disabled = false;
   for (const id of [
+    "battle-map",
+    "objectives",
+    "mobility",
     "hud",
     "session",
     "chronicle",
@@ -187,6 +231,8 @@ $("#leave").onclick = () => {
   ])
     $(`#${id}`).classList.add("hidden");
 };
+net.onQueue = (playlist, waiting, needed) =>
+  menus.queued(playlist, waiting, needed);
 net.onStatus = (text) => {
   status = text;
   $("#connection").textContent = text;
@@ -200,6 +246,7 @@ net.onStatus = (text) => {
 };
 net.onError = (code) => {
   const message = errors[code] ?? code.replaceAll("_", " ");
+  menus.error(message);
   notice(message);
   if (!$("#lobby").classList.contains("hidden"))
     $("#lobby-error").textContent = message;
@@ -211,6 +258,9 @@ net.onState = (state, welcome) => {
   if (welcome) {
     prediction.reset(p);
     renderer.configure(net.content);
+    menus.connected(net.content);
+    $("#objectives").classList.remove("hidden");
+    $("#mobility").classList.remove("hidden");
     $("#lobby").classList.add("hidden");
     for (const id of [
       "hud",
@@ -220,8 +270,13 @@ net.onState = (state, welcome) => {
       "match-status",
     ])
       $(`#${id}`).classList.remove("hidden");
-    $("#room-label").textContent = roomName;
-    log("You entered the Shattered Court.");
+    $(".location span").textContent = net.content.arena.name.toUpperCase();
+    $(".location small").textContent = state.match_info.name.toUpperCase();
+    $("#match-status .eyebrow").textContent =
+      state.match_info.kind === "ctf" ? "CAPTURE THE FLAG" : "TEAM ELIMINATION";
+    $("#room-label").textContent =
+      state.match_info.name + (state.match_info.practice ? " · PRACTICE" : "");
+    log(`You entered ${state.match_info.name}.`);
     currentForm = "";
     previous = null;
   }
@@ -258,7 +313,7 @@ net.onState = (state, welcome) => {
     }
     if (previous.phase !== "finished" && state.phase === "finished")
       log(
-        state.winner === net.id
+        state.match_info.winner_team === self()?.team
           ? "Victory. The court is yours."
           : "Defeat. Rise again next round.",
       );
@@ -270,6 +325,7 @@ net.onState = (state, welcome) => {
   }
   previous = state;
   updateHud();
+  menus.update(state, net.id);
 };
 
 function tooltip(a: Ability) {
@@ -282,6 +338,7 @@ function updateHud() {
   if (!p || !state || !content || !p.private) return;
   const tick = state.tick;
   const info = content.classes[p.class_id];
+  if (status === "CONNECTED") updateObjectives(state, content, net.id);
   $("#self-name").textContent = info.name;
   $("#self-health").style.width = `${(p.health / p.max_health) * 100}%`;
   $("#self-hp").textContent =
@@ -314,26 +371,51 @@ function updateHud() {
           : "Enemy combatant";
   }
   $("#round-label").textContent =
-    `Round ${state.round || 1} · ${state.players.length}/2 combatants`;
+    `${state.players.length}/${state.match_info.team_size * 2} combatants · ${state.players.filter((p) => p.bot).length} bots`;
   const remaining = Math.max(0, Math.ceil((state.starts_at - tick) / 20));
   $("#phase").textContent =
     state.phase === "waiting"
-      ? "Awaiting a rival"
+      ? "Assembling teams"
       : state.phase === "countdown"
         ? `Prepare · ${remaining}`
         : state.phase === "finished"
-          ? state.winner === net.id
+          ? state.match_info.winner_team === self()?.team
             ? "Victory"
             : "Defeat"
           : `Round ${state.round}`;
   $("#phase-detail").textContent =
     state.phase === "waiting"
-      ? "Invite a second browser to this arena channel."
+      ? location.search.includes("direct=1")
+        ? "Invite a second browser to this arena channel."
+        : "Waiting for assigned players to load."
       : state.phase === "countdown"
         ? "Know your abilities. Choose your moment."
         : state.phase === "finished"
-          ? `The court awakens again in ${remaining}s.`
+          ? location.search.includes("direct=1")
+            ? `The court awakens again in ${remaining}s.`
+            : "Match complete. Results are ready."
           : "Steel. Spell. Resolve.";
+  $("#score").textContent =
+    `JADE ${state.match_info.scores[0]} : ${state.match_info.scores[1]} EMBER`;
+  const seconds = Math.max(
+    0,
+    Math.ceil((state.match_info.ends_at - tick) / 20),
+  );
+  $("#match-clock").textContent =
+    state.phase === "active"
+      ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+      : state.phase;
+  $("#flag-status").textContent = state.match_info.flags
+    .map(
+      (f) =>
+        `${f.team === 0 ? "Jade" : "Ember"} flag: ${f.carrier !== null ? `carried by #${f.carrier}` : f.dropped_until ? "dropped" : "home"}`,
+    )
+    .join(" · ");
+  $("#mobility").textContent =
+    `Q · ${info.mobility.name}${p.private.mobility_until > tick ? " · " + Math.ceil((p.private.mobility_until - tick) / 20) + "s" : ""}`;
+  if (p.health <= 0 && p.respawn_at > tick)
+    $("#phase-detail").textContent =
+      `Respawn in ${Math.ceil((p.respawn_at - tick) / 20)}s`;
   if (currentForm !== p.form) {
     currentForm = p.form;
     cancelPlacement();

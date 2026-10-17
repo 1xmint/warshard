@@ -1,0 +1,269 @@
+.front-menu,
+.menu-panel {
+  position: fixed;
+  z-index: 6;
+  background: linear-gradient(130deg, #14232bfa, #0b151cf5);
+  border: 1px solid #b49d6338;
+  box-shadow: 0 20px 90px #0009;
+  padding: 35px;
+  max-height: 82vh;
+  overflow: auto;
+}
+.front-menu {
+  left: 8vw;
+  top: 16vh;
+  width: 430px;
+}
+.front-menu h1 {
+  font-size: 64px;
+  line-height: 1.05;
+  margin: 24px 0;
+}
+.front-menu p,
+.menu-panel p {
+  color: #a1b2af;
+  line-height: 1.8;
+  font-size: 12px;
+}
+.front-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 28px;
+}
+.front-actions button,
+.menu-panel > button,
+.practice-button {
+  padding: 14px 18px;
+  text-align: left;
+  border: 1px solid #b49d6344;
+  background: #243631;
+  color: #dfd8bd;
+}
+.front-actions button {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+}
+.front-actions #play {
+  background: #c9b47f;
+  color: #14232b;
+}
+.front-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.front-actions small {
+  font-size: 8px;
+}
+.build-note {
+  display: block;
+  color: #78918b;
+  font-size: 10px;
+  margin-top: 24px;
+}
+.menu-panel {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 820px;
+  max-width: 95vw;
+  text-align: center;
+}
+.menu-panel h1 {
+  font-size: 38px;
+}
+#playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 24px 0;
+}
+.playlist-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  text-align: left;
+  padding: 18px;
+  background: linear-gradient(135deg, #2b413d, #17282d);
+  border: 1px solid #96a98444;
+}
+.playlist-card strong {
+  font-family: Georgia, serif;
+  font-size: 28px;
+  color: #e5d8b9;
+}
+.playlist-card > span:not(.eyebrow) {
+  color: #b6c5b9;
+  font-size: 11px;
+}
+.playlist-card small {
+  font-size: 8px;
+  color: #c6b784;
+  letter-spacing: 1px;
+}
+.playlist-card:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.playlist-card:hover:enabled {
+  border-color: #d4bb83;
+}
+.text-button {
+  display: block;
+  background: none !important;
+  border: 0 !important;
+  color: #aebdaf !important;
+  padding: 15px !important;
+  font-size: 11px;
+}
+.practice-button {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  text-align: center;
+}
+#queue-count {
+  font-size: 32px;
+  display: block;
+  color: #cfbc8c;
+  margin: 30px;
+}
+#result-roster {
+  max-height: 45vh;
+  overflow: auto;
+  margin: 25px 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 11px;
+}
+td,
+th {
+  padding: 9px;
+  border-bottom: 1px solid #8ba79133;
+}
+th {
+  color: #c9b47f;
+  font-size: 10px;
+}
+#class-inspect {
+  max-height: 55vh;
+  overflow: auto;
+}
+#settings-close,
+#classes-close {
+  float: right;
+  background: none;
+  border: 0;
+  font-size: 22px;
+  color: #d4bb83;
+}
+select {
+  background: #183037;
+  color: #d5dfcc;
+  border: 1px solid #9caf8833;
+  padding: 10px;
+  margin-left: 12px;
+}
+.objective-hud {
+  position: fixed;
+  z-index: 3;
+  top: 175px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  color: #c9bb8d;
+  font-size: 11px;
+}
+.objective-hud > strong {
+  display: block;
+  letter-spacing: 2px;
+}
+.objective-hud > span {
+  display: block;
+  margin-top: 7px;
+}
+#flag-status {
+  font-size: 10px;
+  color: #a2b6a9;
+  margin-top: 7px;
+}
+.mobility-button {
+  position: fixed;
+  bottom: 174px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 8px 14px;
+  background: #1a3034;
+  border: 1px solid #c3b37b77;
+  color: #d9cba7;
+  font-size: 11px;
+}
+#lobby {
+  max-height: 85vh;
+}
+#results {
+  z-index: 9;
+}
+.actor-label b.flag-carrier {
+  color: #ffd778;
+}
+@media (max-width: 750px) {
+  .front-menu {
+    left: 5vw;
+    width: 90vw;
+    top: 13vh;
+  }
+  .front-menu h1 {
+    font-size: 46px;
+  }
+  .menu-panel {
+    padding: 20px;
+  }
+  #playlist-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .objective-hud {
+    top: 240px;
+    width: 80vw;
+  }
+  .mobility-button {
+    bottom: 165px;
+  }
+}
+
+.battle-map {
+  position: fixed;
+  right: 36px;
+  top: 210px;
+  z-index: 3;
+  width: 210px;
+  padding: 12px;
+  background: #10252be8;
+  border: 1px solid #91a58b44;
+  pointer-events: none;
+}
+.battle-map svg {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  background: #1d343b;
+}
+.battle-map small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: #b8c6b5;
+}
+.battle-map .eyebrow {
+  font-size: 8px;
+}
+@media (max-width: 850px) {
+  .battle-map {
+    right: 16px;
+    top: 300px;
+    width: 150px;
+  }
+}

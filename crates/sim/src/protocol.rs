@@ -25,6 +25,17 @@ pub enum ClientMessage {
     Ultimate {
         form: Option<String>,
     },
+    Queue {
+        version: u32,
+        playlist: String,
+        class_id: String,
+        practice: bool,
+    },
+    CancelQueue,
+    Mobility {
+        target: Option<u32>,
+    },
+    LeaveMatch,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -33,8 +44,9 @@ pub enum ServerMessage {
         version: u32,
         id: u32,
         token: String,
-        content: Content,
+        content: Box<Content>,
         state: Snapshot,
+        room: String,
     },
     State {
         state: Snapshot,
@@ -42,6 +54,12 @@ pub enum ServerMessage {
     Error {
         code: String,
     },
+    Queued {
+        playlist: String,
+        waiting: u32,
+        needed: u32,
+    },
+    Cancelled,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Snapshot {
@@ -52,6 +70,41 @@ pub struct Snapshot {
     pub winner: Option<u32>,
     pub players: Vec<PlayerView>,
     pub areas: Vec<AreaView>,
+    pub match_info: MatchView,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct MatchView {
+    pub playlist: String,
+    pub name: String,
+    pub map: String,
+    pub kind: String,
+    pub team_size: u8,
+    pub practice: bool,
+    pub ends_at: u32,
+    pub winner_team: Option<u8>,
+    pub reason: String,
+    pub scores: Vec<u32>,
+    pub flags: Vec<FlagView>,
+    pub stats: BTreeMap<u32, CombatStats>,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+pub struct CombatStats {
+    pub class_id: String,
+    pub team: u8,
+    pub bot: bool,
+    pub damage: i32,
+    pub kills: u32,
+    pub deaths: u32,
+    pub captures: u32,
+    pub returns: u32,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct FlagView {
+    pub team: u8,
+    pub home: Pos,
+    pub pos: Pos,
+    pub carrier: Option<u32>,
+    pub dropped_until: u32,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct PlayerView {
@@ -63,6 +116,8 @@ pub struct PlayerView {
     pub max_health: i32,
     pub shield: i32,
     pub connected: bool,
+    pub bot: bool,
+    pub respawn_at: u32,
     pub form: String,
     pub form_until: u32,
     pub root_until: u32,
@@ -78,6 +133,7 @@ pub struct PrivateView {
     pub cooldowns: BTreeMap<String, u32>,
     pub ack: u32,
     pub lockouts: BTreeMap<String, u32>,
+    pub mobility_until: u32,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct CastView {

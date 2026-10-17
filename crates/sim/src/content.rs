@@ -9,7 +9,10 @@ pub struct Content {
     pub classes: BTreeMap<String, Class>,
     pub forms: BTreeMap<String, Form>,
     pub abilities: BTreeMap<String, Ability>,
+    #[serde(default)]
     pub arena: Arena,
+    pub maps: BTreeMap<String, Arena>,
+    pub playlists: BTreeMap<String, Playlist>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Class {
@@ -19,6 +22,25 @@ pub struct Class {
     pub ultimate_forms: Vec<String>,
     pub health: i32,
     pub color: String,
+    pub mobility: Mobility,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct Mobility {
+    pub name: String,
+    pub distance: i32,
+    pub cooldown: u32,
+    pub retreat: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct Playlist {
+    pub name: String,
+    pub map: String,
+    pub team_size: u8,
+    pub kind: String,
+    pub enabled: bool,
+    pub time_limit: u32,
+    pub capture_limit: u32,
+    pub respawn: u32,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Form {
@@ -76,8 +98,9 @@ pub enum Effect {
         interval: u32,
     },
 }
-#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
 pub struct Arena {
+    pub name: String,
     pub half_x: i32,
     pub half_z: i32,
     pub obstacles: Vec<Obstacle>,
@@ -91,14 +114,21 @@ pub struct Obstacle {
 
 impl Content {
     pub fn load() -> Result<Self, String> {
-        let content: Self = serde_json::from_str(include_str!("../../../data/game.json"))
+        let mut content: Self = serde_json::from_str(include_str!("../../../data/game.json"))
             .map_err(|e| e.to_string())?;
+        // The active map is derived; maps are authored in only one place.
+        content.arena = content
+            .maps
+            .get("shattered_court")
+            .ok_or("missing default map")?
+            .clone();
         content.validate()?;
         Ok(content)
     }
     pub fn validate(&self) -> Result<(), String> {
         let fail = || "invalid content reference, bounds or timing".to_string();
-        if self.version != 1
+        if self.version != 2
+            || self.arena.name.is_empty()
             || self.arena.half_x <= 1000
             || self.arena.half_z <= 1000
             || self.arena.half_x > 100_000
@@ -118,6 +148,31 @@ impl Content {
                     .any(|id| self.forms.get(id).is_none_or(|form| form.duration == 0))
                 || self.forms[&class.base_form].duration != 0
                 || class.health > 100_000
+                || class.mobility.distance <= 0
+                || class.mobility.distance > 8000
+                || class.mobility.cooldown == 0
+            {
+                return Err(fail());
+            }
+        }
+        for map in self.maps.values() {
+            let mut scoped = self.clone();
+            scoped.arena = map.clone();
+            scoped.maps.clear();
+            scoped.playlists.clear();
+            scoped.validate()?;
+        }
+        for playlist in self.playlists.values() {
+            if !self.maps.contains_key(&playlist.map)
+                || playlist.team_size == 0
+                || playlist.team_size > 40
+                || !["arena", "ctf"].contains(&playlist.kind.as_str())
+                || playlist.time_limit == 0
+                || playlist.time_limit > 72000
+                || playlist.respawn == 0
+                || playlist.respawn > 1200
+                || playlist.capture_limit == 0
+                || playlist.capture_limit > 100
             {
                 return Err(fail());
             }

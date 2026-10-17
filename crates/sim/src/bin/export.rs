@@ -20,6 +20,11 @@ fn main() {
         PlayerView,
         PrivateView,
         CastView,
-        AreaView
+        AreaView,
+        Mobility,
+        Playlist,
+        MatchView,
+        CombatStats,
+        FlagView
     );
 }

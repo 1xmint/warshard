@@ -244,3 +244,145 @@ fn allies_are_excluded_from_enemy_targets_and_area_damage() {
     assert_eq!(w.players[&1].view.health, 1435);
     assert_eq!(w.players[&3].view.health, 1250);
 }
+
+fn ctf() -> World {
+    let mut w = World::configured(Content::load().unwrap(), "ctf_6", false).unwrap();
+    w.rules.config.team_size = 1;
+    w.rules.view.team_size = 1;
+    w.add(1, "briarwarden", 0, 0).unwrap();
+    w.add(2, "ashweaver", 1, 1).unwrap();
+    advance(&mut w, 61);
+    assert_eq!(w.phase, Phase::Active);
+    w
+}
+#[test]
+fn ctf_pickup_capture_requires_own_flag_and_dropped_flags_return() {
+    let mut w = ctf();
+    let home = w.rules.view.flags[0].home;
+    let enemy = w.rules.view.flags[1].home;
+    w.players.get_mut(&1).unwrap().view.pos = enemy;
+    w.step();
+    assert_eq!(w.rules.view.flags[1].carrier, Some(1));
+    w.players.get_mut(&2).unwrap().view.pos = home;
+    w.step();
+    w.players.get_mut(&1).unwrap().view.pos = home;
+    w.step();
+    assert_eq!(w.rules.view.scores, [0, 0]);
+    w.connected(2, false);
+    assert!(w.rules.view.flags[0].dropped_until > w.tick);
+    w.step();
+    assert_eq!(w.rules.view.scores, [1, 0]);
+    assert_eq!(w.rules.view.stats[&1].returns, 1);
+    assert_eq!(w.rules.view.flags[1].carrier, None);
+}
+#[test]
+fn ctf_death_drops_flag_respawns_and_does_not_end_match() {
+    let mut w = ctf();
+    w.players.get_mut(&1).unwrap().view.pos = w.rules.view.flags[1].home;
+    w.step();
+    w.damage(2, 1, 9999);
+    assert_eq!(w.rules.view.flags[1].carrier, None);
+    assert!(w.rules.view.flags[1].dropped_until > w.tick);
+    assert_eq!(w.rules.view.stats[&2].kills, 1);
+    assert_eq!(w.rules.view.stats[&1].deaths, 1);
+    advance(&mut w, 159);
+    assert_eq!(w.players[&1].view.health, 0);
+    assert_eq!(w.phase, Phase::Active);
+    w.step();
+    assert_eq!(w.players[&1].view.health, 1500);
+    assert_eq!(w.players[&1].view.pos, w.rules.view.flags[0].home);
+}
+#[test]
+fn ctf_recovery_auto_return_capture_limit_and_final_results() {
+    let mut w = ctf();
+    let enemy = w.rules.view.flags[1].home;
+    let home = w.rules.view.flags[0].home;
+    w.players.get_mut(&1).unwrap().view.pos = enemy;
+    w.step();
+    w.connected(1, false);
+    w.players.get_mut(&2).unwrap().view.pos = Pos { x: 0, z: -12000 };
+    assert!(w.rules.view.flags[1].dropped_until > w.tick);
+    advance(&mut w, 300);
+    assert_eq!(w.rules.view.flags[1].pos, enemy);
+    assert_eq!(w.rules.view.flags[1].dropped_until, 0);
+    w.connected(1, true);
+    for _ in 0..3 {
+        w.players.get_mut(&1).unwrap().view.pos = enemy;
+        w.step();
+        w.players.get_mut(&1).unwrap().view.pos = home;
+        w.step();
+    }
+    assert_eq!(w.phase, Phase::Finished);
+    assert_eq!(w.rules.view.winner_team, Some(0));
+    assert_eq!(w.rules.view.reason, "capture_limit");
+    advance(&mut w, 200);
+    assert_eq!(w.phase, Phase::Finished);
+}
+#[test]
+fn arena_ends_on_team_elimination_instead_of_any_death() {
+    let mut w = World::configured(Content::load().unwrap(), "arena_2", false).unwrap();
+    for id in 1..=4 {
+        w.add(
+            id,
+            "briarwarden",
+            ((id - 1) % 2) as usize,
+            ((id - 1) % 2) as u8,
+        )
+        .unwrap();
+    }
+    advance(&mut w, 61);
+    w.damage(1, 2, 9999);
+    w.step();
+    assert_eq!(w.phase, Phase::Active);
+    w.damage(1, 4, 9999);
+    w.step();
+    assert_eq!(w.phase, Phase::Finished);
+    assert_eq!(w.rules.view.winner_team, Some(0));
+}
+#[test]
+fn both_teams_absent_draw_and_departed_players_remain_in_results() {
+    let mut w = ctf();
+    w.connected(1, false);
+    w.connected(2, false);
+    advance(&mut w, 601);
+    assert_eq!(w.rules.view.reason, "forfeit");
+    assert_eq!(w.rules.view.winner_team, None);
+    w.remove(1);
+    assert_eq!(w.rules.view.stats[&1].class_id, "briarwarden");
+    assert_eq!(w.rules.view.stats[&1].team, 0);
+}
+#[test]
+fn time_limits_draw_and_forfeit_outcomes_are_explicit() {
+    let mut w = ctf();
+    w.rules.view.ends_at = w.tick + 1;
+    w.step();
+    assert_eq!(w.rules.view.winner_team, None);
+    assert_eq!(w.rules.view.reason, "time_limit");
+    let mut w = ctf();
+    w.rules.view.scores = vec![1, 2];
+    w.rules.view.ends_at = w.tick + 1;
+    w.step();
+    assert_eq!(w.rules.view.winner_team, Some(1));
+    let mut w = ctf();
+    w.connected(2, false);
+    advance(&mut w, 601);
+    assert_eq!(w.rules.view.reason, "forfeit");
+    assert_eq!(w.rules.view.winner_team, Some(0));
+}
+#[test]
+fn root_diminishing_returns_and_mobility_are_server_owned() {
+    let mut w = duel();
+    close(&mut w);
+    let root = w.content.abilities["snare"].clone();
+    for expected in [40, 20, 10, 0] {
+        w.players.get_mut(&2).unwrap().view.root_until = 0;
+        w.resolve(1, &root, Some(2), None);
+        assert_eq!(w.players[&2].view.root_until - w.tick, expected);
+    }
+    assert_eq!(w.mobility(2, Some(1)), Ok(()));
+    assert_eq!(w.mobility(2, Some(1)), Err("mobility_cooldown"));
+    let mut w = duel();
+    let before = w.players[&1].view.pos.distance_sq(w.players[&2].view.pos);
+    w.mobility(1, Some(2)).unwrap();
+    assert!(w.players[&1].view.pos.distance_sq(w.players[&2].view.pos) < before);
+}
