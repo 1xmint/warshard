@@ -74,7 +74,13 @@ impl World {
         }
     }
 
-    pub fn add(&mut self, id: u32, class_id: &str, spawn: usize) -> Result<(), &'static str> {
+    pub fn add(
+        &mut self,
+        id: u32,
+        class_id: &str,
+        spawn: usize,
+        team: u8,
+    ) -> Result<(), &'static str> {
         if self.players.contains_key(&id) {
             return Err("duplicate_player");
         }
@@ -90,6 +96,7 @@ impl World {
             Player {
                 view: PlayerView {
                     id,
+                    team,
                     class_id: class_id.into(),
                     pos,
                     health: class.health,
@@ -181,7 +188,7 @@ impl World {
                     .players
                     .get(&target.ok_or("select_target")?)
                     .ok_or("invalid_target")?;
-                if t.view.id == id || t.view.health <= 0 {
+                if t.view.team == source.team || t.view.health <= 0 {
                     return Err("invalid_target");
                 }
                 t.view.pos
@@ -468,6 +475,10 @@ impl World {
                 .iter()
                 .filter(|(id, p)| {
                     **id != area.view.owner
+                        && self
+                            .players
+                            .get(&area.view.owner)
+                            .is_some_and(|owner| owner.view.team != p.view.team)
                         && p.view.pos.distance_sq(area.view.pos)
                             <= i64::from(area.view.radius).pow(2)
                         && self.content.arena.line_of_sight(area.view.pos, p.view.pos)

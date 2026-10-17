@@ -12,7 +12,7 @@ Babylon includes picking, scene graph, materials and animation infrastructure. T
 
 ## Modules and simulation
 
-`sim` owns `World`, geometry, content and combat. `server` owns room routing and one task per match. `client` owns presentation and input. `data` owns definitions. No simulation code references networking, rendering, persistence or wall time.
+`sim` owns `World`, geometry, content and combat. `server` owns room routing and one task per match. `client` owns presentation and input. `data` owns definitions. No simulation code references networking, rendering, persistence or wall time. Admission assigns an explicit team ID; enemy targeting and area pulses exclude allies. The current victory condition is a duel rule; battleground objectives and roster limits will change match lifecycle/admission, not damage resolution.
 
 20 Hz fixed steps, integer time/positions, stable player iteration, no random rules. Replays are content version plus commands at tick boundaries; reproducibility is within the same rules/content version. Each tick expires timers, moves actors, completes casts, pulses areas and evaluates lifecycle. Commands apply before a tick. Movement expires after 250 ms without refreshed input. Dead players cannot act. Movement cancels cast-time abilities. Start and completion validate range/line of sight/targets. Cost, cooldown and GCD commit on accepted casts, with no refund for interrupts/fizzles. No facing checks or directional bonuses.
 

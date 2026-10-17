@@ -571,7 +571,10 @@ export class ArenaRenderer {
         const scaleY = this.canvas.clientHeight / this.engine.getRenderHeight();
         actor.label.style.left = `${screen.x * scaleX}px`;
         actor.label.style.top = `${screen.y * scaleY}px`;
-        actor.label.classList.toggle("enemy", p.id !== localId);
+        actor.label.classList.toggle(
+          "enemy",
+          p.team !== latest.players.find((q) => q.id === localId)?.team,
+        );
         const name = this.content.classes[p.class_id].name;
         actor.label.innerHTML = `${name}${p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%"></i></span>${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
       }

@@ -56,6 +56,7 @@ pub struct Snapshot {
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct PlayerView {
     pub id: u32,
+    pub team: u8,
     pub class_id: String,
     pub pos: Pos,
     pub health: i32,

@@ -74,7 +74,7 @@ function cancelPlacement() {
 }
 function target(id: number | null) {
   const valid = net.state?.players.find(
-    (p) => p.id === id && p.id !== net.id && p.health > 0,
+    (p) => p.id === id && p.team !== self()?.team && p.health > 0,
   );
   selectedTarget = valid?.id ?? null;
   updateHud();
@@ -127,7 +127,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Tab") {
     const opponents =
       net.state?.players
-        .filter((p) => p.id !== net.id && p.health > 0)
+        .filter((p) => p.team !== self()?.team && p.health > 0)
         .sort((a, b) => a.id - b.id) ?? [];
     target(
       opponents[

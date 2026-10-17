@@ -50,7 +50,7 @@ pub(crate) async fn run_room(
                         if sessions.len() >= 2 { let _ = reply.send(Err("room_full")); continue; }
                         let spawn = (0..2).find(|index| sessions.values().all(|s| s.spawn != *index)).unwrap();
                         let id = next_id; next_id += 1;
-                        if let Err(code) = world.add(id, &class_id, spawn) { let _ = reply.send(Err(code)); continue; }
+                        if let Err(code) = world.add(id, &class_id, spawn, spawn as u8) { let _ = reply.send(Err(code)); continue; }
                         let token = uuid::Uuid::new_v4().to_string();
                         sessions.insert(token.clone(), Session { id, generation: 1, disconnected_at: None, spawn });
                         let _ = reply.send(Ok(Admission { id, generation: 1, welcome: ServerMessage::Welcome { version: PROTOCOL, id, token, content: (*content).clone(), state: world.snapshot(id) } }));

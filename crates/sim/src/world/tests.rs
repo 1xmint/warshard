@@ -2,8 +2,8 @@ use super::*;
 
 fn duel() -> World {
     let mut w = World::new(Content::load().unwrap());
-    w.add(1, "briarwarden", 0).unwrap();
-    w.add(2, "ashweaver", 1).unwrap();
+    w.add(1, "briarwarden", 0, 0).unwrap();
+    w.add(2, "ashweaver", 1, 1).unwrap();
     for _ in 0..61 {
         w.step();
     }
@@ -231,4 +231,16 @@ fn additional_forms_use_the_same_validated_activation_and_expiry_path() {
     assert_eq!(w.players[&1].view.form, "alternate");
     advance(&mut w, 10);
     assert_eq!(w.players[&1].view.form, "warden");
+}
+
+#[test]
+fn allies_are_excluded_from_enemy_targets_and_area_damage() {
+    let mut w = duel();
+    w.add(3, "ashweaver", 0, 1).unwrap();
+    let point = w.players[&1].view.pos;
+    assert_eq!(w.cast(2, 0, Some(3), None), Err("invalid_target"));
+    w.cast(2, 4, None, Some(point)).unwrap();
+    advance(&mut w, 31);
+    assert_eq!(w.players[&1].view.health, 1435);
+    assert_eq!(w.players[&3].view.health, 1250);
 }
