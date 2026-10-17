@@ -20,6 +20,39 @@ fn close(w: &mut World) {
 }
 
 #[test]
+fn analog_steering_is_bounded_and_facing_never_grants_movement() {
+    let mut w = duel();
+    let start = w.players[&1].view.pos;
+    assert_eq!(w.steer(1, 1, 1000, 1000, 0), Err("invalid_movement"));
+    assert_eq!(
+        w.steer(1, 1, i16::MIN, i16::MAX, 0),
+        Err("invalid_movement")
+    );
+    assert_eq!(w.steer(1, 1, 0, 0, 6284), Err("invalid_movement"));
+    w.steer(1, 1, 600, 800, 927).unwrap();
+    w.step();
+    assert_eq!(
+        w.players[&1].view.pos,
+        Pos {
+            x: start.x + 150,
+            z: start.z + 200
+        }
+    );
+    assert_eq!(w.players[&1].view.facing, 927);
+    let pos = w.players[&1].view.pos;
+    w.steer(1, 2, 0, 0, 2000).unwrap();
+    w.step();
+    assert_eq!(w.players[&1].view.pos, pos);
+    assert_eq!(w.players[&1].view.facing, 2000);
+    w.players.get_mut(&1).unwrap().view.root_until = w.tick + 10;
+    w.steer(1, 3, 1000, 0, 3000).unwrap();
+    w.step();
+    assert_eq!(w.players[&1].view.pos, pos);
+    assert_eq!(w.players[&1].view.facing, 3000);
+    assert_eq!(w.steer(1, 3, 0, 0, 0), Err("stale_input"));
+}
+
+#[test]
 fn range_target_resources_and_gcd_are_authoritative() {
     let mut w = duel();
     assert_eq!(w.cast(1, 0, Some(2), None), Err("out_of_range"));

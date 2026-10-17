@@ -87,7 +87,7 @@ export class ArenaRenderer {
     this.placement.position.y = 0.04;
     this.placement.setEnabled(false);
     canvas.addEventListener("pointermove", (event) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = this.canvas.getBoundingClientRect();
       const pick = this.scene.pick(
         event.clientX - rect.left,
         event.clientY - rect.top,
@@ -100,34 +100,33 @@ export class ArenaRenderer {
           }
         : null;
     });
-    canvas.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      const pick = this.scene.pick(
-        x,
-        y,
-        (m) => m === this.ground || typeof m.metadata?.playerId === "number",
-      );
-      let id: number | null = null;
-      if (typeof pick?.pickedMesh?.metadata?.playerId === "number")
-        id = pick.pickedMesh.metadata.playerId as number;
-      const floor = this.scene.pick(x, y, (m) => m === this.ground);
-      const point = floor?.pickedPoint
-        ? {
-            x: Math.round(floor.pickedPoint.x * 1000),
-            z: Math.round(floor.pickedPoint.z * 1000),
-          }
-        : null;
-      this.onPick(id, point);
-    });
     window.addEventListener("resize", () => this.resize());
     this.resize();
   }
+  pickAt(clientX: number, clientY: number) {
+    this.scene.updateTransformMatrix();
+    const rect = this.canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const pick = this.scene.pick(
+      x,
+      y,
+      (m) => m === this.ground || typeof m.metadata?.playerId === "number",
+    );
+    let id: number | null = null;
+    if (typeof pick?.pickedMesh?.metadata?.playerId === "number")
+      id = pick.pickedMesh.metadata.playerId as number;
+    const floor = this.scene.pick(x, y, (m) => m === this.ground);
+    const point = floor?.pickedPoint
+      ? {
+          x: Math.round(floor.pickedPoint.x * 1000),
+          z: Math.round(floor.pickedPoint.z * 1000),
+        }
+      : null;
+    this.onPick(id, point);
+  }
   private resize() {
     this.engine.resize();
-    this.camera.radius = innerWidth / innerHeight < 1.3 ? 48 : 39;
   }
   private material(color: string, glow = false, alpha = 1) {
     const key = `${color}/${glow}/${alpha}`;
@@ -494,19 +493,23 @@ export class ArenaRenderer {
     this.actors.set(player.id, actor);
     return actor;
   }
-  render(localId: number, predicted: Pos | null, target: number | null) {
+  render(
+    localId: number,
+    predicted: Pos | null,
+    target: number | null,
+    facing: number,
+  ) {
     const latest = this.frames.at(-1)?.state;
     const now = performance.now();
     if (latest && this.content) {
-      if (latest.match_info.kind === "ctf") {
-        const local = latest.players.find((p) => p.id === localId);
-        if (local) {
-          this.camera.target.x +=
-            (local.pos.x / 1000 - this.camera.target.x) * 0.08;
-          this.camera.target.z +=
-            (local.pos.z / 1000 - this.camera.target.z) * 0.08;
-        }
-      } else this.camera.target.setAll(0);
+      const local = latest.players.find((p) => p.id === localId);
+      if (local) {
+        const focus = predicted ?? local.pos;
+        this.camera.target.x += (focus.x / 1000 - this.camera.target.x) * 0.15;
+        this.camera.target.z += (focus.z / 1000 - this.camera.target.z) * 0.15;
+      }
+      // Labels and picking must use this frame's orbit/follow transform.
+      this.scene.updateTransformMatrix();
       for (const flag of latest.match_info.flags) {
         let root = this.flagMeshes.get(flag.team);
         if (!root) {
@@ -565,21 +568,8 @@ export class ArenaRenderer {
           (pos.z / 1000 - actor.root.position.z) * (p.id === localId ? 0.5 : 1);
         const moved =
           Vector3.DistanceSquared(actor.root.position, actor.lastPos) > 0.00001;
-        if (moved)
-          actor.root.rotation.y = Math.atan2(
-            -(actor.root.position.x - actor.lastPos.x),
-            -(actor.root.position.z - actor.lastPos.z),
-          );
-        else if (p.casting && target !== null) {
-          const t = latest.players.find(
-            (q) => q.id === (p.id === localId ? target : localId),
-          );
-          if (t)
-            actor.root.rotation.y = Math.atan2(
-              -(t.pos.x - p.pos.x),
-              -(t.pos.z - p.pos.z),
-            );
-        }
+        actor.root.rotation.y =
+          (p.id === localId ? facing : p.facing / 1000) + Math.PI;
         actor.body.position.y = moved
           ? Math.sin(now / 85) * 0.045
           : Math.sin(now / 600 + p.id) * 0.025;

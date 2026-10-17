@@ -105,7 +105,13 @@ async fn connection(mut socket: WebSocket, app: App) {
                 tokio::select! {
                     biased;
                     result=&mut assignment => { break result.ok(); },
-                    changed=status.changed() => { if changed.is_err() {break None;} let message=serde_json::to_string(&*status.borrow_and_update()).unwrap(); if !send(&mut socket,&message,&app.metrics).await {break None;} },
+                    changed=status.changed() => {
+                        // A ticket's status sender is dropped during successful assignment.
+                        // Closed status is not a failed admission: consume its final handoff.
+                        if changed.is_err() { break assignment.await.ok(); }
+                        let message=serde_json::to_string(&*status.borrow_and_update()).unwrap();
+                        if !send(&mut socket,&message,&app.metrics).await {break None;}
+                    },
                     message=socket.recv() => {
                         if let Some(Ok(Message::Text(text)))=message && matches!(serde_json::from_str::<ClientMessage>(&text),Ok(ClientMessage::CancelQueue)) { send(&mut socket,&serde_json::to_string(&ServerMessage::Cancelled).unwrap(),&app.metrics).await; }
                         break None;

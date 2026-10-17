@@ -205,7 +205,7 @@ test("protocol rejects wrong versions and malformed admission", async ({
       }),
       await request({
         type: "join",
-        version: 2,
+        version: 3,
         room: "../bad",
         class_id: "briarwarden",
         resume: null,

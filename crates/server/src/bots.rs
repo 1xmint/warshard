@@ -41,33 +41,18 @@ pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, u32>) {
             let ranged = world.content.abilities[&form.abilities[0]].range > 5000;
             let combat = state.match_info.kind == "arena" || distance < 9000_i64.pow(2);
             if combat && world.content.arena.line_of_sight(p.pos, enemy.pos) {
-                if p.private.as_ref().unwrap().energy >= 100 {
-                    let _ = world.ultimate(id, None);
-                }
-                let slot = if enemy.casting.is_some() {
-                    3
-                } else if p.health < p.max_health / 2 && p.shield == 0 {
-                    2
-                } else if world.tick.is_multiple_of(80) && ranged {
-                    4
-                } else {
-                    0
-                };
-                if world.cast(id, slot, target, Some(enemy.pos)).is_ok()
-                    && world.content.abilities[&form.abilities[usize::from(slot)]].cast > 0
+                // Easy practice: one basic attack every two seconds, staggered per bot.
+                // No cast-reading interrupts, defensive combos, mobility or Ascension.
+                if world.tick % 40 == (id * 7) % 40
+                    && world.cast(id, 0, target, None).is_ok()
+                    && world.content.abilities[&form.abilities[0]].cast > 0
                 {
                     continue;
                 }
                 if p.casting.is_some() {
                     continue;
                 }
-                if !ranged && distance > 4000_i64.pow(2) || ranged && distance < 2200_i64.pow(2) {
-                    let _ = world.mobility(id, target);
-                }
-                if !objective_role
-                    && ranged
-                    && (4000_i64.pow(2)..11000_i64.pow(2)).contains(&distance)
-                {
+                if !objective_role && ranged && distance < 11000_i64.pow(2) {
                     continue;
                 }
             }
@@ -160,6 +145,50 @@ fn direction(arena: &Arena, from: Pos, goal: Pos) -> (i8, i8) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn easy_bot_uses_slow_basic_attacks_without_interrupts_or_ascension() {
+        let mut world = World::new(Content::load().unwrap());
+        world.add(1, "briarwarden", 0, 0).unwrap();
+        world.add(2, "ashweaver", 1, 1).unwrap();
+        for _ in 0..61 {
+            world.step();
+        }
+        world.players.get_mut(&1).unwrap().view.pos = Pos { x: 4000, z: 0 };
+        world.players.get_mut(&1).unwrap().view.bot = true;
+        world.cast(2, 0, Some(1), None).unwrap();
+        let mut sequences = BTreeMap::new();
+        for _ in 0..10 {
+            update(&mut world, &mut sequences);
+            world.step();
+        }
+        assert!(
+            world
+                .snapshot(1)
+                .players
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .casting
+                .is_some()
+        );
+        for _ in 0..390 {
+            update(&mut world, &mut sequences);
+            world.step();
+        }
+        let state = world.snapshot(1);
+        let bot = state.players.iter().find(|p| p.id == 1).unwrap();
+        assert_eq!(bot.form, "warden");
+        assert_eq!(bot.private.as_ref().unwrap().energy, 100);
+        assert!(
+            bot.private
+                .as_ref()
+                .unwrap()
+                .cooldowns
+                .keys()
+                .all(|id| id == "thorncut")
+        );
+        assert!(state.match_info.stats[&1].damage <= 10 * 95);
+    }
     #[test]
     fn practice_bots_navigate_fight_and_follow_objectives_without_state_shortcuts() {
         let mut world = World::configured(Content::load().unwrap(), "ctf_10", true).unwrap();
