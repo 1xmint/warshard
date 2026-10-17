@@ -7,7 +7,6 @@ export function moveStep(
   step: number,
   arena: Arena,
 ): Pos {
-  if (dx && dz) step = Math.trunc((step * 707) / 1000);
   const walkable = (p: Pos) =>
     Math.abs(p.x) <= arena.half_x - 350 &&
     Math.abs(p.z) <= arena.half_z - 350 &&
@@ -16,9 +15,9 @@ export function moveStep(
         (p.x - o.pos.x) ** 2 + (p.z - o.pos.z) ** 2 > (o.radius + 350) ** 2,
     );
   let next = { ...pos };
-  const x = { x: pos.x + dx * step, z: pos.z };
+  const x = { x: pos.x + Math.trunc((dx * step) / 1000), z: pos.z };
   if (walkable(x)) next = x;
-  const z = { x: next.x, z: pos.z + dz * step };
+  const z = { x: next.x, z: pos.z + Math.trunc((dz * step) / 1000) };
   if (walkable(z)) next = z;
   return next;
 }

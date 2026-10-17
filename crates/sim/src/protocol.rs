@@ -17,6 +17,12 @@ pub enum ClientMessage {
         dx: i8,
         dz: i8,
     },
+    Steer {
+        seq: u32,
+        dx: i16,
+        dz: i16,
+        facing: u16,
+    },
     Cast {
         slot: u8,
         target: Option<u32>,
@@ -112,6 +118,7 @@ pub struct PlayerView {
     pub team: u8,
     pub class_id: String,
     pub pos: Pos,
+    pub facing: u16,
     pub health: i32,
     pub max_health: i32,
     pub shield: i32,

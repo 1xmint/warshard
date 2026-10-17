@@ -1,3 +1,4 @@
+import { MouseControls } from "./controls";
 import { updateObjectives } from "./objectives";
 import "./style.css";
 import "./menus.css";
@@ -18,6 +19,17 @@ try {
     "WebGL could not start. Enable hardware acceleration or try another browser.";
   throw error;
 }
+const controls = new MouseControls(
+  renderer.canvas,
+  renderer.camera,
+  () =>
+    status === "CONNECTED" &&
+    !document.querySelector("dialog[open]") &&
+    ["front", "modes", "queue-panel", "results", "lobby"].every((id) =>
+      $("#" + id).classList.contains("hidden"),
+    ),
+  (x, y) => renderer.pickAt(x, y),
+);
 const prediction = new Prediction();
 const keys = new Set<string>();
 let selectedClass = "briarwarden";
@@ -186,6 +198,7 @@ window.addEventListener("blur", () => keys.clear());
 document.addEventListener("visibilitychange", () => keys.clear());
 $("#soundless").onclick = () => {
   keys.clear();
+  controls.release();
   help.showModal();
 };
 $("#close-help").onclick = () => help.close();
@@ -215,6 +228,7 @@ $("#leave").onclick = () => {
   net.cancelQueue();
   sessionStorage.removeItem("warshard.join");
   keys.clear();
+  controls.release();
   cancelPlacement();
   menus.main();
   $<HTMLButtonElement>("#join").disabled = false;
@@ -257,6 +271,7 @@ net.onState = (state, welcome) => {
   if (!p || !net.content) return;
   if (welcome) {
     prediction.reset(p);
+    controls.reset(p.facing);
     renderer.configure(net.content);
     menus.connected(net.content);
     $("#objectives").classList.remove("hidden");
@@ -473,25 +488,30 @@ function updateHud() {
 setInterval(() => {
   const p = self();
   if (!p || !net.content || status !== "CONNECTED") return;
-  const moving = !help.open && !document.hidden;
+  const moving =
+    !document.querySelector("dialog[open]") && !document.hidden && active();
+  if (!moving) controls.release();
   const dx = moving ? Number(keys.has("KeyD")) - Number(keys.has("KeyA")) : 0;
   const dz = moving ? Number(keys.has("KeyW")) - Number(keys.has("KeyS")) : 0;
   if (net.socket?.bufferedAmount && net.socket.bufferedAmount > 16_384) return;
+  const direction = controls.movement(dx, dz);
   const input = prediction.sample(
-    dx,
-    dz,
+    direction.dx,
+    direction.dz,
     p,
     net.content.arena,
     net.state!.tick,
     active(),
   );
-  if (!net.send({ type: "input", ...input })) prediction.pending = [];
+  if (!net.send({ type: "steer", ...input, facing: direction.facing }))
+    prediction.pending = [];
 }, 50);
 renderer.engine.runRenderLoop(() => {
   renderer.render(
     net.id,
     status === "CONNECTED" ? prediction.pos : null,
     selectedTarget,
+    controls.facing,
   );
   if (performance.now() > noticeUntil) $("#notice").textContent = "";
   const p = self();

@@ -77,6 +77,7 @@ pub(crate) async fn run_room(
                         let valid = sessions.values().any(|s| s.id == id && s.generation == generation && s.disconnected_at.is_none());
                         let result = if !valid { Err("stale_session") } else { match message {
                             ClientMessage::Input { seq, dx, dz } => world.input(id, seq, dx, dz),
+                            ClientMessage::Steer { seq, dx, dz, facing } => world.steer(id, seq, dx, dz, facing),
                             ClientMessage::Cast { slot, target, point } => world.cast(id, slot, target, point),
                             ClientMessage::Ultimate { form } => world.ultimate(id, form.as_deref()),
                             ClientMessage::Mobility { target } => world.mobility(id,target),

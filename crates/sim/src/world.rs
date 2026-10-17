@@ -29,8 +29,9 @@ struct PendingCast {
 #[derive(Clone, Debug)]
 struct Movement {
     seq: u32,
-    dx: i8,
-    dz: i8,
+    dx: i16,
+    dz: i16,
+    facing: u16,
     received: u32,
 }
 #[derive(Clone, Debug)]
@@ -109,6 +110,7 @@ impl World {
                     team,
                     class_id: class_id.into(),
                     pos,
+                    facing: 0,
                     health: class.health,
                     max_health: class.health,
                     shield: 0,
@@ -169,6 +171,35 @@ impl World {
         if !(-1..=1).contains(&dx) || !(-1..=1).contains(&dz) {
             return Err("invalid_movement");
         }
+        let p = self.players.get(&id).ok_or("unknown_player")?;
+        let facing = if dx == 0 && dz == 0 {
+            p.view.facing
+        } else {
+            (f64::from(dx)
+                .atan2(f64::from(dz))
+                .rem_euclid(std::f64::consts::TAU)
+                * 1000.0) as u16
+        };
+        let scale = if dx != 0 && dz != 0 { 707 } else { 1000 };
+        self.steer(
+            id,
+            seq,
+            i16::from(dx) * scale,
+            i16::from(dz) * scale,
+            facing,
+        )
+    }
+    pub fn steer(
+        &mut self,
+        id: u32,
+        seq: u32,
+        dx: i16,
+        dz: i16,
+        facing: u16,
+    ) -> Result<(), &'static str> {
+        if i64::from(dx).pow(2) + i64::from(dz).pow(2) > 1_000_000 || facing > 6283 {
+            return Err("invalid_movement");
+        }
         let p = self.players.get_mut(&id).ok_or("unknown_player")?;
         if seq <= p.received_seq {
             return Err("stale_input");
@@ -183,6 +214,7 @@ impl World {
             seq,
             dx,
             dz,
+            facing,
             received: self.tick,
         });
         Ok(())
@@ -497,6 +529,9 @@ impl World {
             }
             if let Some(input) = p.inputs.pop_front() {
                 p.private.ack = input.seq;
+                if active && p.view.health > 0 && p.view.connected {
+                    p.view.facing = input.facing;
+                }
                 if active && p.view.health > 0 && p.view.connected && self.tick >= p.view.root_until
                 {
                     let step = if self.tick < p.view.slow_until {
@@ -507,7 +542,7 @@ impl World {
                     let next = self
                         .content
                         .arena
-                        .move_step(p.view.pos, input.dx, input.dz, step);
+                        .move_vector(p.view.pos, input.dx, input.dz, step);
                     if next != p.view.pos {
                         p.cast = None;
                     }

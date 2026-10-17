@@ -89,7 +89,7 @@ async fn main() {
     };
     let router = Router::new()
         .route("/ws", get(upgrade))
-        .route("/health", get(|| async { "warshard protocol=2\n" }))
+        .route("/health", get(|| async { "warshard protocol=3\n" }))
         .route("/metrics", get(metrics))
         .with_state(app);
     let bind = std::env::var("BIND").unwrap_or_else(|_| "127.0.0.1:3001".into());
