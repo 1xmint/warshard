@@ -207,6 +207,9 @@ export class MouseControls {
   private showCursor() {
     this.cursor.show(this.locked() && !this.buttons && this.enabled());
   }
+  renderCursor() {
+    this.cursor.render();
+  }
   private stopDrag() {
     this.buttons = 0;
     this.uiPressed = null;

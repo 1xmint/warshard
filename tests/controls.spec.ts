@@ -5,6 +5,34 @@ import type {
   Snapshot,
 } from "../client/src/protocol";
 
+test("cursor batches pointer samples per frame and keeps the latest position", async ({
+  page,
+}) => {
+  await page.goto("/health");
+  const result = await page.evaluate(async () => {
+    const path = "/src/game-cursor.ts";
+    const { GameCursor } = await import(path);
+    const picks: number[][] = [];
+    const cursor = new GameCursor((x: number, y: number) => picks.push([x, y]));
+    for (let i = 0; i < 100; i++) cursor.set(i, i);
+    const beforeFrame = picks.length;
+    cursor.render();
+    cursor.render(); // An unchanged frame must not repeat picking or DOM work.
+    const afterIdleFrame = picks.length;
+    cursor.set(200, 300);
+    cursor.render();
+    return { beforeFrame, afterIdleFrame, picks };
+  });
+  expect(result).toEqual({
+    beforeFrame: 0,
+    afterIdleFrame: 1,
+    picks: [
+      [99, 99],
+      [200, 300],
+    ],
+  });
+});
+
 for (const allowLock of [true, false]) {
   test(`mouse orbit, steering and cleanup (${allowLock ? "native pointer lock" : "lock denied fallback"})`, async ({
     page,
