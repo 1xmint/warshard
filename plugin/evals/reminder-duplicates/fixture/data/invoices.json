@@ -1,0 +1,7 @@
+[
+  {"id": "INV-1001", "client": "Harbor Cafe", "email": "accounts@harborcafe.example", "amount": 420.00, "due": "2026-09-30", "paid": false},
+  {"id": "INV-1002", "client": "Lopez Design", "email": "", "amount": 1250.00, "due": "2026-10-01", "paid": false},
+  {"id": "INV-1003", "client": "Northside Gym", "email": "billing@northsidegym.example", "amount": 380.00, "due": "2026-10-05", "paid": false},
+  {"id": "INV-1004", "client": "Patel & Co", "email": "office@patelco.example", "amount": 975.50, "due": "2026-10-08", "paid": true},
+  {"id": "INV-1005", "client": "Greenleaf Florist", "email": "hello@greenleaf.example", "amount": 210.00, "due": "2026-11-15", "paid": false}
+]
