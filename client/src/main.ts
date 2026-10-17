@@ -29,6 +29,7 @@ const controls = new MouseControls(
       $("#" + id).classList.contains("hidden"),
     ),
   (x, y) => renderer.pickAt(x, y),
+  () => notice("Mouse lock is unavailable here; camera drag still works."),
 );
 const prediction = new Prediction();
 const keys = new Set<string>();
