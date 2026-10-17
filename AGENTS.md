@@ -31,7 +31,7 @@ Read README.md for the product goal, then inspect the relevant source and curren
   - `unsupported` (the check cannot apply here)
   - `error` (the checker itself failed)
 
-  Zero discovered tests never count as passing. Each project gets a verdict, and the exit status is non-zero for any failed required outcome (1), checker error (2), or inconclusive result where nothing required ran (3). `--case NAME --workspace DIR` checks a single directory, such as a fixture.
+  Zero discovered tests never count as passing. Each project gets a verdict, and the exit status is non-zero for any failed required outcome (1), checker error (2), or inconclusive result where nothing required ran (3), and is 4 when the project did everything else but a `requirement` check failed: a conflict between stated requirements that awaits the user's decision. Only a pass is a successful implementation. `--case NAME --workspace DIR` checks a single directory, such as a fixture.
 - Report outcomes, records, engineering practices, and user effort separately; do not present an aggregate eval score as product benefit. These scripts and graders are the maintained automated checks. Anything verified by hand goes in the PR as manual evidence. When a regression against baseline repeats across runs, diagnose it instead of tuning checks until they pass.
 
 ## Repository hygiene

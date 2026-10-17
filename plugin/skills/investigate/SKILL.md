@@ -31,10 +31,12 @@ Check each stated requirement against every outcome, including rare ones. When o
 - **Missing evidence.** You don't yet know what a service or system can do. Check its documentation or behavior. If that cannot settle it, say what is unknown and what would settle it.
 - **A demonstrated incompatibility.** Established facts show that no feasible design satisfies every requirement.
 
-Only the last is a conflict between requirements, and only after the feasible alternatives have been examined. Then:
-- Propose the compromise and its consequences.
-- Ask before adopting it. Do not implement a behavior that breaks a stated requirement on your own.
-- Meanwhile, finish the work that does not depend on the decision.
+Only the last is a conflict between requirements, and only after the feasible alternatives have been examined. Then the decision belongs to the user:
+- Lay out the alternatives and what each one means for them. Recommend one when you have a real basis.
+- Ask, and leave the conflicting behavior as it was until they decide. Existing behavior that already breaks one requirement does not authorize switching to a design that breaks another.
+- Finish the work that does not depend on the decision.
+
+A completed investigation that ends with this decision pending is a legitimate result. Report it as that, not as a finished fix.
 
 ## Exercise the paths connected to the complaint
 Test the failure paths that could produce the reported symptom, such as:
