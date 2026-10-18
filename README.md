@@ -21,7 +21,7 @@ Open http://localhost:5173 → **Arcanist duel · Play now** for a solo mirror d
 | 2 | Flare Lance | 1.5-second stationary cast, 145 base damage. Stronger pressure when you can stand still. |
 | 3 | Flashkindle | Instant guaranteed critical, 55 base damage. Two charges, recharging one at a time every 10 seconds. Use to complete Kindling. |
 | 4 | Sunshard | 4.5-second cast, 300 base damage. Kindling makes it instant; its critical hits start the next chain. |
-| 5 | Riftstep | Blink 5 metres in your facing direction, 12-second cooldown. Stops at cover; roots prevent it. |
+| 5 | Riftstep | Blink 5 metres in your facing direction, 12-second cooldown. Off the global cooldown and cancels your cast. Stops at cover; roots prevent it. |
 | Q | Prism Ward | Absorb 240 damage for up to 6 seconds, 20-second cooldown. Works during casts and the global cooldown without interrupting your spell. |
 | E | Crownfall | 0.75-second cast, then a meteor falls for 1.2 seconds at the target's position when the cast finishes. Deals 240 damage within 2.7 metres, 20-second cooldown. Enemies can escape or use cover. |
 | R | Spellstorm | At 100 earned energy, transform for 12 seconds: halve cast times, add 15 critical-chance points and gain an instant Sunshard. |

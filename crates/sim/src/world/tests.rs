@@ -206,6 +206,19 @@ fn content_and_collision_contracts() {
 }
 
 #[test]
+fn ability_flags_cannot_replace_a_pending_cast_or_define_incoherent_builders() {
+    let mut content = Content::load().unwrap();
+    content.abilities.get_mut("cinder_dart").unwrap().off_gcd = true;
+    assert!(content.validate().is_err());
+    let mut content = Content::load().unwrap();
+    content.abilities.get_mut("cinder_dart").unwrap().cast = 0;
+    assert!(content.validate().is_err());
+    let mut content = Content::load().unwrap();
+    content.abilities.get_mut("cinder_dart").unwrap().chains = false;
+    assert!(content.validate().is_err());
+}
+
+#[test]
 fn bounded_movement_cannot_speed_up_and_reconnect_acknowledges_discarded_inputs() {
     let mut w = duel();
     let start = w.players[&1].view.pos;

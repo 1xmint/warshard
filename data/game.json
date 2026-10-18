@@ -619,14 +619,14 @@
     },
     "riftstep": {
       "name": "Riftstep",
-      "description": "Blink up to 5m in the direction you face. Stops at terrain; roots prevent it.",
+      "description": "Two charges. Blink up to 5m in the direction you face. Stops at terrain; roots prevent it. Charges recover one at a time every 12 seconds.",
       "icon": "blink",
       "target": "own",
       "range": 0,
       "cast": 0,
       "cooldown": 240,
       "cost": 10,
-      "gcd": 10,
+      "gcd": 0,
       "school": "arcane",
       "effects": [
         {
@@ -634,11 +634,12 @@
           "distance": 5000
         }
       ],
-      "off_gcd": true
+      "off_gcd": true,
+      "charges": 2
     },
     "unweave": {
-      "name": "Unweave",
-      "description": "Interrupt the target and lock its spell school for 3 seconds.",
+      "name": "Sunderflare",
+      "description": "A searing arcane lash deals 70 damage and slows for 1.5 seconds. If it catches a cast, interrupt it and lock that spell school for 3 seconds. Cancels your own cast; off the global cooldown.",
       "icon": "interrupt",
       "target": "enemy",
       "range": 12500,
@@ -651,6 +652,14 @@
         {
           "kind": "interrupt",
           "duration": 60
+        },
+        {
+          "kind": "damage",
+          "amount": 70
+        },
+        {
+          "kind": "slow",
+          "duration": 30
         }
       ],
       "off_gcd": true

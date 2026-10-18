@@ -238,6 +238,9 @@ impl Content {
                 || ability.range < 0
                 || ability.range > 100_000
                 || ability.effects.is_empty()
+                || (ability.off_gcd && ability.cast > 0)
+                || (ability.cast_while_moving && ability.cast == 0)
+                || (ability.primes_chain && !ability.chains)
                 || ability.cooldown == 0
                 || (!ability.off_gcd && ability.gcd == 0)
                 || ability.cast > 1200
