@@ -112,7 +112,10 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   const oldId = rb.id;
   const oldTick = rb.state!.tick;
   await b.reload();
-  await expect(b.locator("#connection")).toHaveText("CONNECTED");
+  // Recovery includes a fresh WebGL context on CI's shared software GPU.
+  await expect(b.locator("#connection")).toHaveText("CONNECTED", {
+    timeout: 15000,
+  });
   await expect.poll(() => rb.welcomeCount).toBe(2);
   expect(rb.id).toBe(oldId);
   expect(own(rb)!.health).toBe(oldHealth);

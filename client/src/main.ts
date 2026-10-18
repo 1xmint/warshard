@@ -565,6 +565,10 @@ setInterval(() => {
     prediction.pending = [];
 }, 50);
 renderer.engine.runRenderLoop(() => {
+  // Let connection/recovery handshakes run before expensive shader work.
+  // Background tabs retain networking without competing for the GPU.
+  if (document.hidden || status === "CONNECTING" || status === "RECONNECTING")
+    return;
   controls.renderCursor();
   combat.render();
   renderer.render(

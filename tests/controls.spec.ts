@@ -119,7 +119,8 @@ for (const allowLock of [true, false]) {
       expect(current().pos).toEqual(pos);
       return pos;
     };
-    await expect.poll(() => state?.phase).toBe("active");
+    // Three seconds of countdown plus first-use shader work on software GPUs.
+    await expect.poll(() => state?.phase, { timeout: 15000 }).toBe("active");
     const origin = { ...current().pos },
       facing = current().facing;
     await page.mouse.move(650, 650);
