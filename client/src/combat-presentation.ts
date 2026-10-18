@@ -116,14 +116,17 @@ export class CombatPresentation {
       if (event.kind === "cast")
         this.renderer.cue(event.source, source?.class_id === "briarwarden");
       if (
-        ["hit", "crit", "blink", "depart", "ascend", "interrupt"].includes(
+        ["hit", "crit", "blink", "depart", "ascend", "interrupt", "nova"].includes(
           event.kind,
         )
       ) {
         const blink = event.kind === "blink" || event.kind === "depart";
         const ascension = event.kind === "ascend";
+        const glasswake = event.ability === "glasswake";
         const color = blink
           ? "#8cdce8"
+          : glasswake
+            ? "#71e8f1"
           : ascension
             ? "#ffc95c"
             : event.kind === "crit"
@@ -134,16 +137,16 @@ export class CombatPresentation {
         const meshes = [0, ...(ascension ? [1, 2] : [])].map((ring) => {
           const mesh = MeshBuilder.CreateTorus(
             "spell-impact",
-            { diameter: ascension ? 1.4 + ring * 0.55 : 1.05, thickness: ascension ? 0.12 : 0.09, tessellation: 20 },
+            { diameter: glasswake ? 5.4 : ascension ? 1.4 + ring * 0.55 : 1.05, thickness: glasswake ? 0.13 : ascension ? 0.12 : 0.09, tessellation: 48 },
             this.renderer.scene,
           );
-          mesh.position.set(event.pos.x / 1000, blink ? 0.15 : 1.05 + ring * 0.18, event.pos.z / 1000);
+          mesh.position.set(event.pos.x / 1000, blink || glasswake ? 0.18 : 1.05 + ring * 0.18, event.pos.z / 1000);
           mesh.material = this.material(color);
           mesh.isPickable = false;
           return mesh;
         });
         // A single line mesh supplies the burst of embers, rather than many particle draw calls.
-        if (!blink && event.kind !== "interrupt") {
+        if (!blink && !glasswake && event.kind !== "interrupt") {
           const lines = Array.from({ length: ascension ? 12 : 7 }, (_, i) => {
             const angle = i * 2.39996 + event.id;
             const radius = ascension ? 1.6 : event.ability === "sunshard" ? 1.25 : 0.75;

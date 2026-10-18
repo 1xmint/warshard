@@ -44,6 +44,7 @@ let selectedTarget: number | null = null;
 let placement: number | null = null;
 let status = "OFFLINE";
 let currentForm = "";
+let currentClass = "";
 let previous: Snapshot | null = null;
 let noticeUntil = 0;
 let stateAt = 0;
@@ -77,7 +78,6 @@ const heroUI = new ArcanistUI({
     cancelPlacement();
     net.send({ type: "reset_practice", difficulty });
   },
-  barrier: () => cast(6),
   sound: () => {
     combat.muted = !combat.muted;
     return combat.muted;
@@ -224,7 +224,9 @@ window.addEventListener("keydown", (event) => {
     self()?.class_id === "arcanist"
       ? cast(5)
       : net.send({ type: "mobility", target: selectedTarget });
-  else if (event.code === "KeyE" && self()?.class_id === "arcanist") cast(6);
+  else if (event.code === "KeyE") cast(6);
+  else if (event.code === "KeyF") cast(7);
+  else if (event.code === "KeyC") cast(8);
   else if (event.code === "Escape") {
     if (placement !== null) {
       cancelPlacement();
@@ -402,8 +404,21 @@ net.onState = (state, welcome) => {
   menus.update(state, net.id);
 };
 
-function tooltip(a: Ability) {
-  return `${a.name}\n${a.description}\n${a.target === "own" ? "Self" : `${a.range / 1000}m range`} · ${a.cast ? `${a.cast / 20}s cast` : "Instant"} · ${a.cooldown / 20}s cooldown · ${a.cost} focus`;
+function tooltip(a: Ability, id: string) {
+  const playstyle: Record<string, string> = {
+    cinder_dart: "Mobile pressure. A normal hit starts Kindling; only a critical hit can complete it.",
+    flare_lance: "Stationary filler. Use it while safe to stand still.",
+    flashkindle: "Two guaranteed critical hits. Spend a charge to complete prepared Kindling.",
+    sunshard: "Long cast unless Kindling makes it instant. A critical hit can start a new chain.",
+    riftstep: "Blink to reposition or escape.",
+    prism_ward: "Instant shield. Off the global cooldown and does not interrupt your current cast.",
+    crownfall: "Stationary cast. Locks the enemy's position at completion; the meteor lands after a short descent and hits a small area.",
+    unweave: "Instant interrupt. Stops an enemy cast and briefly locks their spell school.",
+    glasswake: "Instant self-centered burst that roots nearby enemies.",
+  };
+  const castTime = a.cast ? `${a.cast / 20}s cast${a.cast_while_moving ? " · can move" : " · stationary"}` : "Instant";
+  const gcd = a.off_gcd ? "Off global cooldown" : "Uses global cooldown";
+  return `${a.name}\n${a.description}\n${playstyle[id] ?? "Use this ability to control the pace of the duel."}\n${a.target === "own" ? "Self" : `${a.range / 1000}m range`} · ${castTime} · ${a.cooldown / 20}s cooldown · ${a.cost} focus · ${gcd}`;
 }
 function updateHud() {
   const p = self();
@@ -485,27 +500,33 @@ function updateHud() {
         `${f.team === 0 ? "Jade" : "Ember"} flag: ${f.carrier !== null ? `carried by #${f.carrier}` : f.dropped_until ? "dropped" : "home"}`,
     )
     .join(" · ");
-  $("#mobility").textContent = info.utilities.length
-    ? `Q · ${content.abilities[info.utilities[0]].name}`
-    : `Q · ${info.mobility.name}${p.private.mobility_until > tick ? " · " + Math.ceil((p.private.mobility_until - tick) / 20) + "s" : ""}`;
+  const arcanist = p.class_id === "arcanist";
+  $("#mobility").classList.toggle("hidden", arcanist);
+  $("#utility-actions").classList.toggle("hidden", arcanist);
+  $("#mobility").textContent = `Q · ${info.mobility.name}${p.private.mobility_until > tick ? " · " + Math.ceil((p.private.mobility_until - tick) / 20) + "s" : ""}`;
   if (p.health <= 0 && p.respawn_at > tick)
     $("#phase-detail").textContent =
       `Respawn in ${Math.ceil((p.respawn_at - tick) / 20)}s`;
-  if (currentForm !== p.form) {
+  if (currentForm !== p.form || currentClass !== p.class_id) {
     currentForm = p.form;
+    currentClass = p.class_id;
     cancelPlacement();
     $("#abilities").replaceChildren();
-    content.forms[p.form].abilities.forEach((id, slot) => {
+    $("#utility-abilities").replaceChildren();
+    const addAbility = (id: string, slot: number, key: string) => {
       const ability = content.abilities[id];
       const button = document.createElement("button");
       button.className = "ability";
-      button.title = tooltip(ability);
+      button.title = tooltip(ability, id);
       button.dataset.slot = String(slot);
-      button.setAttribute("aria-label", `${slot + 1}: ${ability.name}`);
-      button.innerHTML = `<span class="key">${slot + 1}</span><span class="ability-icon">${spellIcon(ability.icon)}</span><span class="ability-name">${ability.name}</span><span class="gcd-shade"></span><span class="cooldown-shade"></span><span class="cooldown-label"></span><span class="charge-count"></span>`;
+      button.setAttribute("aria-label", `${key}: ${ability.name}`);
+      button.innerHTML = `<span class="key">${key}</span><span class="ability-icon">${spellIcon(ability.icon)}</span><span class="ability-name">${ability.name}</span><span class="gcd-shade"></span><span class="cooldown-shade"></span><span class="cooldown-label"></span><span class="charge-count"></span>`;
       button.onclick = () => cast(slot);
-      $("#abilities").append(button);
-    });
+      $(slot < 5 ? "#abilities" : "#utility-abilities").append(button);
+    };
+    content.forms[p.form].abilities.forEach((id, slot) => addAbility(id, slot, String(slot + 1)));
+    const utilityKeys = ["Q", "E", "F", "C"];
+    info.utilities.forEach((id, index) => addAbility(id, index + 5, utilityKeys[index] ?? String(index + 6)));
   }
   $("#form-name").textContent =
     `${content.forms[p.form].name}${p.form_until > tick ? ` · ${Math.ceil((p.form_until - tick) / 20)}s` : " · PRIMARY FORM"}`;
@@ -514,7 +535,8 @@ function updateHud() {
     ".ability",
   )) {
     const slot = Number(button.dataset.slot);
-    const id = form.abilities[slot];
+    const id = slot < 5 ? form.abilities[slot] : info.utilities[slot - 5];
+    if (!id) continue;
     const a = content.abilities[id];
     const left = Math.max(
       0,
@@ -523,8 +545,7 @@ function updateHud() {
         ? p.private.charges[id].next_at - tick
         : 0,
     );
-    const gcdLeft = a.effects.some((effect) => effect.kind === "blink")
-      ? 0 : Math.max(0, p.private.gcd_until - tick);
+    const gcdLeft = a.off_gcd ? 0 : Math.max(0, p.private.gcd_until - tick);
     button.classList.toggle("global-cooldown", gcdLeft > 0);
     (button.querySelector(".gcd-shade") as HTMLElement).style.transform =
       `scaleY(${Math.min(1, gcdLeft / Math.max(1, a.gcd))})`;
@@ -545,7 +566,7 @@ function updateHud() {
     button.classList.toggle(
       "proc-ready",
       p.class_id === "arcanist" &&
-        slot === 3 &&
+        id === "sunshard" &&
         p.private.chain.ready_until > tick,
     );
   }

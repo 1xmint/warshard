@@ -742,6 +742,13 @@ export class ArenaRenderer {
       for (const area of latest.areas) {
         let mesh = this.areaMeshes.get(area.id);
         if (!mesh) {
+          const meteor = area.ability === "crownfall" ? MeshBuilder.CreateSphere("crownfall-meteor", { diameter: 0.78, segments: 10 }, this.scene) : null;
+          if (meteor) {
+            meteor.material = this.material("#fff0bd", true);
+            meteor.isPickable = false;
+          }
+          const tail = area.ability === "crownfall" ? this.cylinder("crownfall-tail", 0.22, 1.25, 0, 0, 0, "#ff8746", undefined, 0) : null;
+          if (tail) tail.isPickable = false;
           mesh = MeshBuilder.CreateDisc(
             "fire-field",
             {
@@ -753,16 +760,17 @@ export class ArenaRenderer {
           );
           mesh.rotation.x = Math.PI / 2;
           mesh.position.set(area.pos.x / 1000, 0.14, area.pos.z / 1000);
-          mesh.material = this.material("#d88e52", true, 0.35);
+          mesh.material = this.material(area.ability === "crownfall" ? "#e5b96f" : "#d88e52", true, area.ability === "crownfall" ? 0.24 : 0.35);
           mesh.isPickable = false;
           const ring = this.ring(
             "field-edge",
             (area.radius * 2) / 1000,
-            "#edb47d",
+            area.ability === "crownfall" ? "#ffe3a1" : "#edb47d",
             0.06,
           );
           ring.parent = mesh;
           ring.rotation.x = Math.PI / 2;
+          const flames: Mesh[] = [];
           for (let i = 0; i < 9; i++) {
             const flame = this.cylinder(
               "cinder",
@@ -784,13 +792,35 @@ export class ArenaRenderer {
             );
             flame.rotation.x = -Math.PI / 2;
             flame.material = this.material("#eec584", true);
+            flames.push(flame);
           }
+          mesh.metadata = { flames, meteor, tail };
           this.areaMeshes.set(area.id, mesh);
         }
-        mesh.visibility = 0.7 + Math.sin(now / 140) * 0.25;
+        const presentation = mesh.metadata as { flames: Mesh[]; meteor: Mesh | null; tail: Mesh | null };
+        if (area.ability === "crownfall") {
+          const tick = latest.tick + Math.min(2, (now - (this.frames.at(-1)?.at ?? now)) / 50);
+          const descent = tick < area.activates;
+          const progress = Math.max(0, Math.min(1, (tick - area.started) / Math.max(1, area.activates - area.started)));
+          if (presentation.meteor) {
+            presentation.meteor.isVisible = descent;
+            presentation.meteor.position.set(area.pos.x / 1000, 4.6 - progress * 4.1, area.pos.z / 1000);
+          }
+          if (presentation.tail) {
+            presentation.tail.isVisible = descent;
+            presentation.tail.position.set(area.pos.x / 1000, 4.0 - progress * 3.8, area.pos.z / 1000);
+          }
+          for (const flame of presentation.flames) flame.isVisible = !descent;
+          mesh.visibility = descent ? 0.3 : 0.7 + Math.sin(now / 140) * 0.25;
+        } else {
+          mesh.visibility = 0.7 + Math.sin(now / 140) * 0.25;
+        }
       }
       for (const [id, mesh] of this.areaMeshes)
         if (!latest.areas.some((a) => a.id === id)) {
+          const presentation = mesh.metadata as { meteor: Mesh | null; tail: Mesh | null };
+          presentation.meteor?.dispose();
+          presentation.tail?.dispose();
           mesh.dispose(false);
           this.areaMeshes.delete(id);
         }

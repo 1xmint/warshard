@@ -10,6 +10,8 @@ const paths: Record<string, string> = {
     '<path d="m7 7 22 22M11 4l-5 8 7 6-6 9m19-23 5 8-7 6 6 10M6 18h24"/>',
   barrier:
     '<path d="M18 3 31 9v10c0 7-8 12-13 15C13 31 5 26 5 19V9Z"/><path d="m18 10 7 8-7 9-7-9Z"/>',
+  spark:
+    '<circle cx="18" cy="18" r="5"/><path d="M18 2v8m0 16v8M2 18h8m16 0h8M6.7 6.7l5.7 5.7m11.2 11.2 5.7 5.7m0-22.6-5.7 5.7m-11.2 11.2-5.7 5.7"/>',
 };
 export function spellIcon(id: string) {
   const path = paths[id];

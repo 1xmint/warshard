@@ -112,17 +112,6 @@
   font-size: 11px;
   line-height: 1.5;
 }
-.arcanist-barrier {
-  position: fixed;
-  right: 25px;
-  bottom: 245px;
-  padding: 12px;
-  background: #193743;
-  color: #a1e1ee;
-  border: 1px solid #629cab;
-  border-radius: 4px;
-  z-index: 6;
-}
 .combat-number {
   position: fixed;
   left: 0;
@@ -173,8 +162,8 @@
   margin-bottom: 10px;
   padding: 8px 12px;
 }
-.utility-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
-#utility-actions #mobility, #utility-actions #arcanist-barrier {
+.utility-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
+#utility-actions #mobility {
   position: static;
   transform: none;
   padding: 7px 12px;
@@ -186,3 +175,24 @@
   border-radius: 3px;
 }
 .hud .cast-wrap { margin-right: 0; }
+#abilities, #utility-abilities { display: flex; justify-content: center; gap: 4px; }
+#utility-abilities { margin-top: 4px; }
+.ability-row { gap: 10px; align-items: center; }
+.kit { min-width: 0; }
+.kit > .eyebrow { margin-bottom: 5px; }
+.ability { width: 54px; height: 59px; padding: 3px; }
+.ability-icon { line-height: 34px; font-size: 25px; }
+.ability-icon svg { width: 28px; height: 28px; }
+.ability-name { font-size: 7px; letter-spacing: -0.15px; }
+.cooldown-label { font-size: 23px; }
+#ultimate { flex: 0 0 70px; width: 70px; height: 70px; }
+#ultimate .ult-icon { font-size: 33px; line-height: 30px; }
+.hud { min-width: 0; max-width: calc(100vw - 16px); }
+.hud-legend { gap: 10px; margin-top: 10px; }
+@media (max-width: 560px) {
+  .ability { width: 48px; height: 55px; }
+  .ability-icon { line-height: 31px; }
+  .ability-icon svg { width: 25px; height: 25px; }
+  #ultimate { flex-basis: 62px; width: 62px; height: 62px; }
+  .hud-legend { gap: 6px; font-size: 7px; }
+}
