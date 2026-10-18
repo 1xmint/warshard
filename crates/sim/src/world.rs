@@ -1,5 +1,6 @@
 use crate::{geometry::Pos, *};
 use std::collections::{BTreeMap, VecDeque};
+mod hero;
 mod rules;
 pub use rules::Rules;
 
@@ -60,6 +61,10 @@ pub struct World {
     pub players: BTreeMap<u32, Player>,
     areas: Vec<Area>,
     next_area: u32,
+    projectiles: Vec<ProjectileView>,
+    events: VecDeque<CombatEvent>,
+    next_event: u32,
+    rng: u64,
     round: u32,
     starts_at: u32,
     winner: Option<u32>,
@@ -75,6 +80,10 @@ impl World {
             players: BTreeMap::new(),
             areas: vec![],
             next_area: 1,
+            projectiles: vec![],
+            events: VecDeque::new(),
+            next_event: 1,
+            rng: 0x5741525348415244,
             round: 0,
             starts_at: 0,
             winner: None,
@@ -122,6 +131,7 @@ impl World {
                     root_until: 0,
                     slow_until: 0,
                     casting: None,
+                    bot_action: None,
                     private: None,
                 },
                 private: PrivateView {
@@ -132,6 +142,8 @@ impl World {
                     ack: 0,
                     lockouts: BTreeMap::new(),
                     mobility_until: 0,
+                    chain: ChainView::default(),
+                    charges: BTreeMap::new(),
                 },
                 cast: None,
                 inputs: VecDeque::new(),
@@ -279,19 +291,23 @@ impl World {
     ) -> Result<(), &'static str> {
         self.actionable(id)?;
         let p = &self.players[&id];
-        let ability_id = self.content.forms[&p.view.form]
-            .abilities
-            .get(usize::from(slot))
-            .ok_or("invalid_slot")?
-            .clone();
+        let ability_id = self.ability_id(id, slot).ok_or("invalid_slot")?.to_string();
         let a = self.content.abilities[&ability_id].clone();
-        if p.cast.is_some() {
+        let blink = a
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::Blink { .. }));
+        if p.cast.is_some() && slot < 5 && !blink {
             return Err("already_casting");
         }
-        if p.private.gcd_until > self.tick {
+        if slot < 5 && !blink && p.private.gcd_until > self.tick {
             return Err("global_cooldown");
         }
-        if p.private.cooldowns.get(&ability_id).copied().unwrap_or(0) > self.tick {
+        if a.charges > 1 && self.charge_count(id, &ability_id) == 0 {
+            return Err("cooldown");
+        }
+        if a.charges <= 1 && p.private.cooldowns.get(&ability_id).copied().unwrap_or(0) > self.tick
+        {
             return Err("cooldown");
         }
         if p.private.lockouts.get(&a.school).copied().unwrap_or(0) > self.tick {
@@ -301,24 +317,62 @@ impl World {
             return Err("resource");
         }
         self.valid_target(id, &a, target, point)?;
+        for effect in &a.effects {
+            if let Effect::Blink { distance } = effect {
+                if self.tick < p.view.root_until {
+                    return Err("rooted");
+                }
+                if self.blink_destination(id, *distance) == p.view.pos {
+                    return Err("no_path");
+                }
+            }
+        }
+        let cast_ticks = if p.view.form == "spellstorm" {
+            a.cast / 2
+        } else {
+            a.cast
+        };
+        let instant = a.consumes_chain && p.private.chain.ready_until > self.tick;
+        self.emit(id, target, &ability_id, "cast", 0);
         let p = self.players.get_mut(&id).unwrap();
+        if slot >= 5 || blink {
+            p.cast = None;
+        }
         p.private.resource -= a.cost;
-        p.private.gcd_until = self.tick + a.gcd;
-        p.private
-            .cooldowns
-            .insert(ability_id.clone(), self.tick + a.cooldown);
-        if a.cast > 0 {
+        p.private.gcd_until = p.private.gcd_until.max(self.tick + a.gcd);
+        if a.charges > 1 {
+            let charge = p
+                .private
+                .charges
+                .entry(ability_id.clone())
+                .or_insert(ChargeView {
+                    count: a.charges,
+                    next_at: 0,
+                });
+            charge.count -= 1;
+            if charge.next_at == 0 {
+                charge.next_at = self.tick + a.cooldown;
+            }
+        } else {
+            p.private
+                .cooldowns
+                .insert(ability_id.clone(), self.tick + a.cooldown);
+        }
+        if instant {
+            p.private.chain.ready_until = 0;
+        }
+        if cast_ticks > 0 && !instant {
             p.cast = Some(PendingCast {
                 view: CastView {
                     ability: ability_id,
                     started: self.tick,
-                    ends: self.tick + a.cast,
+                    ends: self.tick + cast_ticks,
                 },
                 target,
                 point,
             });
         } else {
-            self.resolve(id, &a, target, point);
+            self.launch(id, &ability_id, &a, target, point);
         }
         Ok(())
     }
@@ -340,6 +394,10 @@ impl World {
         p.cast = None;
         p.view.form = form.into();
         p.view.form_until = self.tick + self.content.forms[&p.view.form].duration;
+        if p.view.class_id == "arcanist" {
+            p.private.chain.ready_until = self.tick + 200;
+        }
+        self.emit(id, None, "spellstorm", "ascend", 0);
         Ok(())
     }
     fn damage(&mut self, source: u32, target: u32, amount: i32) {
@@ -372,7 +430,14 @@ impl World {
             self.drop_flags(target);
         }
     }
-    fn resolve(&mut self, source: u32, a: &Ability, target: Option<u32>, point: Option<Pos>) {
+    fn resolve(
+        &mut self,
+        source: u32,
+        ability_id: &str,
+        a: &Ability,
+        target: Option<u32>,
+        point: Option<Pos>,
+    ) {
         let recipient = if a.target == TargetKind::Own {
             source
         } else {
@@ -380,7 +445,13 @@ impl World {
         };
         for effect in &a.effects {
             match *effect {
-                Effect::Damage { amount } => self.damage(source, recipient, amount),
+                Effect::Damage { amount } => self.strike(source, recipient, ability_id, a, amount),
+                Effect::Blink { distance } => {
+                    let destination = self.blink_destination(source, distance);
+                    self.emit(source, None, ability_id, "depart", 0);
+                    self.players.get_mut(&source).unwrap().view.pos = destination;
+                    self.emit(source, None, ability_id, "blink", 0);
+                }
                 Effect::Heal { amount } => {
                     let p = self.players.get_mut(&recipient).unwrap();
                     if p.view.health > 0 {
@@ -403,6 +474,7 @@ impl World {
                             self.content.abilities[&cast.view.ability].school.clone(),
                             self.tick + duration,
                         );
+                        self.emit(source, Some(recipient), ability_id, "interrupt", 0);
                     }
                 }
                 Effect::Root { duration } => {
@@ -451,6 +523,8 @@ impl World {
         self.starts_at = self.tick + 60;
         self.winner = None;
         self.areas.clear();
+        self.projectiles.clear();
+        self.events.clear();
         self.round += 1;
         self.rules.view.ends_at = self.starts_at + self.rules.config.time_limit;
         self.rules.view.scores = vec![0, 0];
@@ -487,12 +561,15 @@ impl World {
             p.private.resource = 100;
             p.private.gcd_until = 0;
             p.private.cooldowns.clear();
+            p.private.charges.clear();
+            p.private.chain = ChainView::default();
             p.private.lockouts.clear();
             p.private.mobility_until = 0;
         }
     }
     pub fn step(&mut self) {
         self.tick += 1;
+        self.hero_tick();
         let ready = self.ready();
         match self.phase {
             Phase::Waiting if ready => self.start_countdown(),
@@ -561,7 +638,7 @@ impl World {
             if self.players[&id].view.health > 0
                 && self.valid_target(id, &a, cast.target, cast.point).is_ok()
             {
-                self.resolve(id, &a, cast.target, cast.point);
+                self.launch(id, &cast.view.ability, &a, cast.target, cast.point);
             }
         }
         let mut pulses = vec![];
@@ -617,6 +694,8 @@ impl World {
                 .collect(),
             areas: self.areas.iter().map(|a| a.view.clone()).collect(),
             match_info: self.rules.view.clone(),
+            projectiles: self.projectiles.clone(),
+            events: self.events.iter().cloned().collect(),
         }
     }
 }

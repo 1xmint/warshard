@@ -25,6 +25,11 @@ fn main() {
         Playlist,
         MatchView,
         CombatStats,
+        BotDifficulty,
+        ChainView,
+        ChargeView,
+        ProjectileView,
+        CombatEvent,
         FlagView
     );
 }

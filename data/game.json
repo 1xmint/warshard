@@ -32,6 +32,26 @@
         "cooldown": 280,
         "retreat": true
       }
+    },
+    "arcanist": {
+      "name": "Arcanist",
+      "description": "Turn sparks into a star. Chain critical hits, bank an instant Sunshard, and kite through a Spellstorm.",
+      "base_form": "arcanist",
+      "ultimate_forms": [
+        "spellstorm"
+      ],
+      "health": 1550,
+      "color": "#f4b96b",
+      "mobility": {
+        "name": "Riftstep",
+        "distance": 5000,
+        "cooldown": 240,
+        "retreat": true
+      },
+      "utilities": [
+        "unweave",
+        "prism_ward"
+      ]
     }
   },
   "forms": {
@@ -78,13 +98,35 @@
         "nova_sever",
         "nova_rain"
       ]
+    },
+    "arcanist": {
+      "name": "Arcanist",
+      "duration": 0,
+      "abilities": [
+        "cinder_dart",
+        "flare_lance",
+        "flashkindle",
+        "sunshard",
+        "riftstep"
+      ]
+    },
+    "spellstorm": {
+      "name": "Spellstorm",
+      "duration": 240,
+      "abilities": [
+        "cinder_dart",
+        "flare_lance",
+        "flashkindle",
+        "sunshard",
+        "riftstep"
+      ]
     }
   },
   "abilities": {
     "thorncut": {
       "name": "Thorncut",
       "description": "A quick close-range strike.",
-      "icon": "Ⅰ",
+      "icon": "\u2160",
       "target": "enemy",
       "range": 2200,
       "cast": 0,
@@ -102,7 +144,7 @@
     "cleave": {
       "name": "Ironbloom",
       "description": "A heavy committed strike.",
-      "icon": "Ⅱ",
+      "icon": "\u2161",
       "target": "enemy",
       "range": 2400,
       "cast": 14,
@@ -120,7 +162,7 @@
     "bark": {
       "name": "Barkguard",
       "description": "Absorb damage for 6 seconds.",
-      "icon": "Ⅲ",
+      "icon": "\u2162",
       "target": "own",
       "range": 0,
       "cast": 0,
@@ -139,7 +181,7 @@
     "hush": {
       "name": "Hushblade",
       "description": "Interrupt a cast; lock its school for 3 seconds.",
-      "icon": "Ⅳ",
+      "icon": "\u2163",
       "target": "enemy",
       "range": 2500,
       "cast": 0,
@@ -157,7 +199,7 @@
     "snare": {
       "name": "Briarbind",
       "description": "Root a nearby enemy for 2 seconds.",
-      "icon": "Ⅴ",
+      "icon": "\u2164",
       "target": "enemy",
       "range": 4500,
       "cast": 0,
@@ -179,7 +221,7 @@
     "bolt": {
       "name": "Emberthread",
       "description": "A ranged cast of searing thread.",
-      "icon": "Ⅰ",
+      "icon": "\u2160",
       "target": "enemy",
       "range": 13000,
       "cast": 28,
@@ -197,7 +239,7 @@
     "spark": {
       "name": "Cinderlash",
       "description": "Instant flame that slows for 2 seconds.",
-      "icon": "Ⅱ",
+      "icon": "\u2161",
       "target": "enemy",
       "range": 10000,
       "cast": 0,
@@ -219,7 +261,7 @@
     "veil": {
       "name": "Ashveil",
       "description": "Wrap yourself in an absorbing ward.",
-      "icon": "Ⅲ",
+      "icon": "\u2162",
       "target": "own",
       "range": 0,
       "cast": 0,
@@ -238,7 +280,7 @@
     "sever": {
       "name": "Threadsever",
       "description": "Interrupt a cast; lock its school for 3 seconds.",
-      "icon": "Ⅳ",
+      "icon": "\u2163",
       "target": "enemy",
       "range": 11000,
       "cast": 0,
@@ -256,7 +298,7 @@
     "rain": {
       "name": "Cinderfall",
       "description": "Place a 4-second field after a 1.5-second cast. No enemy warning until impact.",
-      "icon": "Ⅴ",
+      "icon": "\u2164",
       "target": "ground",
       "range": 12500,
       "cast": 30,
@@ -277,7 +319,7 @@
     "crown_cut": {
       "name": "Crownstrike",
       "description": "Empowered close-range strike.",
-      "icon": "Ⅰ",
+      "icon": "\u2160",
       "target": "enemy",
       "range": 3000,
       "cast": 0,
@@ -295,7 +337,7 @@
     "crown_crush": {
       "name": "Canopy Break",
       "description": "A crushing blow and brief root.",
-      "icon": "Ⅱ",
+      "icon": "\u2161",
       "target": "enemy",
       "range": 3200,
       "cast": 10,
@@ -317,7 +359,7 @@
     "crown_guard": {
       "name": "Heartwood",
       "description": "Restore health and gain a ward.",
-      "icon": "Ⅲ",
+      "icon": "\u2162",
       "target": "own",
       "range": 0,
       "cast": 0,
@@ -340,7 +382,7 @@
     "crown_hush": {
       "name": "Sovereign Hush",
       "description": "Longer reach and a 4-second school lock.",
-      "icon": "Ⅳ",
+      "icon": "\u2163",
       "target": "enemy",
       "range": 5500,
       "cast": 0,
@@ -358,7 +400,7 @@
     "crown_bind": {
       "name": "Wild Edict",
       "description": "Reach out with roots and thorns.",
-      "icon": "Ⅴ",
+      "icon": "\u2164",
       "target": "enemy",
       "range": 7000,
       "cast": 0,
@@ -380,7 +422,7 @@
     "nova_bolt": {
       "name": "Starthread",
       "description": "A faster empowered ranged cast.",
-      "icon": "Ⅰ",
+      "icon": "\u2160",
       "target": "enemy",
       "range": 14000,
       "cast": 16,
@@ -398,7 +440,7 @@
     "nova_spark": {
       "name": "Flarelash",
       "description": "Instant empowered flame.",
-      "icon": "Ⅱ",
+      "icon": "\u2161",
       "target": "enemy",
       "range": 12000,
       "cast": 0,
@@ -420,7 +462,7 @@
     "nova_veil": {
       "name": "Solar Shroud",
       "description": "Heal and absorb incoming damage.",
-      "icon": "Ⅲ",
+      "icon": "\u2162",
       "target": "own",
       "range": 0,
       "cast": 0,
@@ -443,7 +485,7 @@
     "nova_sever": {
       "name": "Eclipse Thread",
       "description": "Interrupt with a longer school lock.",
-      "icon": "Ⅳ",
+      "icon": "\u2163",
       "target": "enemy",
       "range": 13000,
       "cast": 0,
@@ -461,7 +503,7 @@
     "nova_rain": {
       "name": "Falling Sun",
       "description": "An empowered area, visible only after its cast.",
-      "icon": "Ⅴ",
+      "icon": "\u2164",
       "target": "ground",
       "range": 14000,
       "cast": 20,
@@ -476,6 +518,153 @@
           "radius": 3200,
           "duration": 80,
           "interval": 20
+        }
+      ]
+    },
+    "cinder_dart": {
+      "name": "Cinder Dart",
+      "description": "Mobile pressure. Critical hits prepare Kindling; a second critical hit readies an instant Sunshard.",
+      "icon": "dart",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 0,
+      "cooldown": 1,
+      "cost": 8,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 60
+        }
+      ],
+      "crit_chance": 30,
+      "chains": true,
+      "consumes_chain": false,
+      "projectile_step": 1200,
+      "charges": 0
+    },
+    "flare_lance": {
+      "name": "Flare Lance",
+      "description": "A deliberate 1.6-second cast with strong pressure. Interruptible; moving cancels it.",
+      "icon": "lance",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 32,
+      "cooldown": 1,
+      "cost": 12,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 145
+        }
+      ],
+      "crit_chance": 30,
+      "chains": true,
+      "consumes_chain": false,
+      "projectile_step": 1200,
+      "charges": 0
+    },
+    "flashkindle": {
+      "name": "Flashkindle",
+      "description": "Two charges. Always critically strikes: deliberately complete your Kindling chain. Each charge returns in 10 seconds.",
+      "icon": "ignite",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 0,
+      "cooldown": 200,
+      "cost": 6,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 55
+        }
+      ],
+      "crit_chance": 100,
+      "chains": true,
+      "consumes_chain": false,
+      "projectile_step": 0,
+      "charges": 2
+    },
+    "sunshard": {
+      "name": "Sunshard",
+      "description": "A powerful 3-second spell. Conflagration makes the next Sunshard instant for 10 seconds. Its critical hit can start the next chain.",
+      "icon": "sun",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 60,
+      "cooldown": 1,
+      "cost": 16,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 300
+        }
+      ],
+      "crit_chance": 30,
+      "chains": true,
+      "consumes_chain": true,
+      "projectile_step": 800,
+      "charges": 0
+    },
+    "riftstep": {
+      "name": "Riftstep",
+      "description": "Blink up to 5m in the direction you face. Stops at terrain; roots prevent it.",
+      "icon": "blink",
+      "target": "own",
+      "range": 0,
+      "cast": 0,
+      "cooldown": 240,
+      "cost": 10,
+      "gcd": 10,
+      "school": "arcane",
+      "effects": [
+        {
+          "kind": "blink",
+          "distance": 5000
+        }
+      ]
+    },
+    "unweave": {
+      "name": "Unweave",
+      "description": "Interrupt the target and lock its spell school for 3 seconds.",
+      "icon": "interrupt",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 0,
+      "cooldown": 200,
+      "cost": 10,
+      "gcd": 1,
+      "school": "arcane",
+      "effects": [
+        {
+          "kind": "interrupt",
+          "duration": 60
+        }
+      ]
+    },
+    "prism_ward": {
+      "name": "Prism Ward",
+      "description": "Absorb 240 damage for 6 seconds. Time it against incoming pressure.",
+      "icon": "barrier",
+      "target": "own",
+      "range": 0,
+      "cast": 0,
+      "cooldown": 400,
+      "cost": 10,
+      "gcd": 1,
+      "school": "arcane",
+      "effects": [
+        {
+          "kind": "shield",
+          "amount": 240,
+          "duration": 120
         }
       ]
     }

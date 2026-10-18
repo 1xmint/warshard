@@ -1,0 +1,8 @@
+KayKit Character Pack: Adventurers 1.0
+Author: Kay Lousberg / KayKit
+License: CC0-1.0 (see LICENSE.txt)
+Source: https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0
+Revision: 672074b73ba276876a19e8816ecdc5241817ab47
+Retrieved: 2026-10-17
+Files: Mage.glb, Knight.glb, mage_texture.png, knight_texture.png
+Temporary art; animations reduced to nine gameplay clips and unused binary buffers pruned by scripts/prepare-models.py. Geometry and embedded textures retained; original hero identity/effects belong to Warshard.

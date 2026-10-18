@@ -2,7 +2,14 @@
 use std::collections::{BTreeMap, VecDeque};
 use warshard_sim::{geometry::Pos, *};
 
-pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, u32>) {
+#[derive(Default)]
+pub struct BotMemory {
+    seq: u32,
+    next_think: u32,
+    movement: (i16, i16, u16),
+    observed_cast: Option<(u32, u32, u32)>,
+}
+pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, BotMemory>) {
     if world.phase != Phase::Active {
         return;
     }
@@ -13,6 +20,13 @@ pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, u32>) {
         .map(|p| p.view.id)
         .collect();
     for id in ids {
+        if world.rules.view.bot_difficulty != BotDifficulty::Easy {
+            let memory = sequences.entry(id).or_default();
+            trained(world, id, memory);
+            continue;
+        }
+        world.players.get_mut(&id).unwrap().view.bot_action =
+            Some("Easy: approach and basic attack".into());
         let state = world.snapshot(id);
         let p = state.players.iter().find(|p| p.id == id).unwrap();
         let carrying = state.match_info.flags.iter().any(|f| f.carrier == Some(id));
@@ -81,7 +95,7 @@ pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, u32>) {
         };
         let (dx, dz) = direction(&world.content.arena, p.pos, goal);
         let seq = sequences.entry(id).or_default();
-        *seq += 1;
+        seq.seq += 1;
         // Pursue at half speed so humans can open a gap; flag runners retain normal
         // navigation speed. Both still use ordinary validated steering and collisions.
         let scale = match (objective_role, dx != 0 && dz != 0) {
@@ -100,12 +114,188 @@ pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, u32>) {
         };
         let _ = world.steer(
             id,
-            *seq,
+            seq.seq,
             i16::from(dx) * scale,
             i16::from(dz) * scale,
             facing,
         );
     }
+}
+fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
+    let skilled = world.rules.view.bot_difficulty == BotDifficulty::Skilled;
+    let interval = if skilled { 4 } else { 6 };
+    if world.tick >= memory.next_think {
+        memory.next_think = world.tick + interval;
+        // This snapshot intentionally excludes private opponent cooldowns, resources and procs.
+        let state = world.snapshot(id);
+        let own = state.players.iter().find(|p| p.id == id).unwrap();
+        let enemy = state
+            .players
+            .iter()
+            .filter(|p| p.team != own.team && p.health > 0 && p.connected)
+            .min_by_key(|p| own.pos.distance_sq(p.pos));
+        memory.movement = (0, 0, own.facing);
+        if let Some(enemy) = enemy {
+            let distance = own.pos.distance_sq(enemy.pos);
+            let arcanist = own.class_id == "arcanist";
+            let ranged =
+                world.content.abilities[&world.content.forms[&own.form].abilities[0]].range > 5000;
+            let away = |from: Pos| Pos {
+                x: (own.pos.x + (own.pos.x - from.x).signum() * 4000).clamp(
+                    -world.content.arena.half_x + 600,
+                    world.content.arena.half_x - 600,
+                ),
+                z: (own.pos.z + (own.pos.z - from.z).signum() * 4000).clamp(
+                    -world.content.arena.half_z + 600,
+                    world.content.arena.half_z - 600,
+                ),
+            };
+            let danger = state.areas.iter().find(|a| {
+                state
+                    .players
+                    .iter()
+                    .any(|p| p.id == a.owner && p.team != own.team)
+                    && own.pos.distance_sq(a.pos) < i64::from(a.radius + 600).pow(2)
+            });
+            let pressured = own.health * 100 / own.max_health < 40;
+            let mut goal = if let Some(area) = danger {
+                away(area.pos)
+            } else if ranged && distance < 6000_i64.pow(2) {
+                away(enemy.pos)
+            } else if (!ranged && distance > 1800_i64.pow(2))
+                || (ranged && distance > 10000_i64.pow(2))
+                || !world.content.arena.line_of_sight(own.pos, enemy.pos)
+            {
+                enemy.pos
+            } else {
+                own.pos
+            };
+            if let Some(cast) = &enemy.casting {
+                if memory.observed_cast.is_none_or(|(target, started, _)| {
+                    target != enemy.id || started != cast.started
+                }) {
+                    memory.observed_cast = Some((enemy.id, cast.started, world.tick));
+                }
+            } else {
+                memory.observed_cast = None;
+            }
+            let reaction_ready = memory
+                .observed_cast
+                .is_some_and(|(_, _, seen)| world.tick >= seen + if skilled { 4 } else { 8 });
+            let private = own.private.as_ref().unwrap();
+            if arcanist
+                && private.energy >= 100
+                && own.form == "arcanist"
+                && !pressured
+                && own.casting.is_none()
+                && danger.is_none()
+                && enemy.shield == 0
+                && distance <= 12500_i64.pow(2)
+                && world.content.arena.line_of_sight(own.pos, enemy.pos)
+            {
+                let _ = world.ultimate(id, None);
+            }
+            let mut facing_override = None;
+            let mut action = "Hold casting range";
+            let mut cast_slot = None;
+            if reaction_ready {
+                cast_slot = Some(if arcanist { 5 } else { 3 });
+                action = "React to a visible cast";
+            } else if pressured && own.shield == 0 {
+                cast_slot = Some(if arcanist { 6 } else { 2 });
+                action = "Barrier under pressure";
+            } else if arcanist && distance < 4500_i64.pow(2) {
+                // Turn away first, then use the same facing-based blink as the player.
+                let angle = f64::from(own.pos.x - enemy.pos.x)
+                    .atan2(f64::from(own.pos.z - enemy.pos.z))
+                    .rem_euclid(std::f64::consts::TAU);
+                let facing = (angle * 1000.) as u16;
+                facing_override = Some(facing);
+                // Facing is applied by the fixed simulation tick; blink on the next decision.
+                if (i32::from(own.facing) - i32::from(facing)).abs() < 150 {
+                    cast_slot = Some(4);
+                }
+                action = "Turn and blink away";
+                memory.movement.2 = facing;
+            } else if own.casting.is_none() && danger.is_none() {
+                if arcanist {
+                    cast_slot = Some(if private.chain.ready_until > world.tick {
+                        3
+                    } else if private.chain.prepared_until > world.tick
+                        && world.charge_count(id, "flashkindle") > 0
+                    {
+                        2
+                    } else if goal != own.pos {
+                        0
+                    } else {
+                        1
+                    });
+                    action = if private.chain.ready_until > world.tick {
+                        "Spend instant Sunshard"
+                    } else if private.chain.prepared_until > world.tick {
+                        "Complete the critical chain"
+                    } else if goal != own.pos {
+                        "Kite with mobile pressure"
+                    } else {
+                        "Commit to a cast"
+                    };
+                } else {
+                    cast_slot = Some(0);
+                    action = "Basic pressure";
+                }
+            }
+            let succeeded =
+                cast_slot.is_some_and(|slot| world.cast(id, slot, Some(enemy.id), None).is_ok());
+            if !succeeded && own.casting.is_none() && danger.is_none() {
+                let _ = world.cast(id, 0, Some(enemy.id), None);
+            }
+            if succeeded
+                && world
+                    .snapshot(id)
+                    .players
+                    .iter()
+                    .find(|p| p.id == id)
+                    .unwrap()
+                    .casting
+                    .is_some()
+            {
+                goal = own.pos;
+            }
+            if own.casting.is_some() && danger.is_none() && !(ranged && distance < 3500_i64.pow(2))
+            {
+                goal = own.pos;
+            }
+            if goal != own.pos {
+                action = if danger.is_some() {
+                    "Leave hostile area"
+                } else if goal == enemy.pos {
+                    "Close line of sight / range"
+                } else {
+                    "Create distance"
+                };
+            }
+            let (dx, dz) = direction(&world.content.arena, own.pos, goal);
+            let scale = if dx != 0 && dz != 0 { 707 } else { 1000 };
+            let facing = if dx == 0 && dz == 0 {
+                memory.movement.2
+            } else {
+                (f64::from(dx)
+                    .atan2(f64::from(dz))
+                    .rem_euclid(std::f64::consts::TAU)
+                    * 1000.) as u16
+            };
+            memory.movement = (
+                i16::from(dx) * scale,
+                i16::from(dz) * scale,
+                facing_override.unwrap_or(facing),
+            );
+            world.players.get_mut(&id).unwrap().view.bot_action = Some(action.into());
+            // Failed casts do not reveal a hidden opponent state; try another legal action next decision.
+        }
+    }
+    memory.seq += 1;
+    let (dx, dz, facing) = memory.movement;
+    let _ = world.steer(id, memory.seq, dx, dz, facing);
 }
 fn direction(arena: &Arena, from: Pos, goal: Pos) -> (i8, i8) {
     // Small shared collision grid, searched only for bots currently blocked by terrain.
@@ -167,6 +357,85 @@ fn direction(arena: &Arena, from: Pos, goal: Pos) -> (i8, i8) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn trained_bot_reacts_after_delay_without_private_opponent_information() {
+        let mut world = World::configured(Content::load().unwrap(), "arena_1", true).unwrap();
+        world.add(1, "arcanist", 0, 0).unwrap();
+        world.add(2, "arcanist", 1, 1).unwrap();
+        world.players.get_mut(&2).unwrap().view.bot = true;
+        world.rules.view.bot_difficulty = BotDifficulty::Trained;
+        for _ in 0..61 {
+            world.step();
+        }
+        assert!(
+            world
+                .snapshot(2)
+                .players
+                .iter()
+                .find(|p| p.id == 1)
+                .unwrap()
+                .private
+                .is_none()
+        );
+        world.cast(1, 1, Some(2), None).unwrap();
+        let mut memory = BTreeMap::new();
+        for _ in 0..4 {
+            update(&mut world, &mut memory);
+            world.step();
+        }
+        assert!(
+            world
+                .snapshot(1)
+                .players
+                .iter()
+                .find(|p| p.id == 1)
+                .unwrap()
+                .casting
+                .is_some()
+        );
+        for _ in 0..16 {
+            update(&mut world, &mut memory);
+            world.step();
+        }
+        let state = world.snapshot(1);
+        assert!(
+            state
+                .players
+                .iter()
+                .find(|p| p.id == 1)
+                .unwrap()
+                .casting
+                .is_none()
+        );
+        assert!(
+            state
+                .players
+                .iter()
+                .find(|p| p.id == 1)
+                .unwrap()
+                .private
+                .as_ref()
+                .unwrap()
+                .lockouts
+                .get("ember")
+                .is_some_and(|until| *until > world.tick)
+        );
+        assert!(
+            world
+                .players
+                .values()
+                .all(|p| world.content.arena.walkable(p.view.pos))
+        );
+        assert!(
+            state
+                .players
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .bot_action
+                .is_some()
+        );
+    }
     #[test]
     fn human_can_outpace_pursuing_bot_and_roots_still_stop_it() {
         let mut world = World::new(Content::load().unwrap());

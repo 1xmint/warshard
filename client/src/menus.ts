@@ -141,6 +141,10 @@ export class Menus {
     node("lobby").classList.add("hidden");
   }
   update(state: Snapshot, id: number) {
+    if (state.phase !== "finished" && this.resultKey) {
+      this.resultKey = "";
+      this.screen(null);
+    }
     if (
       state.phase !== "finished" ||
       !this.content ||

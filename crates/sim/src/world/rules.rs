@@ -38,6 +38,7 @@ impl Rules {
                 kind: config.kind.clone(),
                 team_size: config.team_size,
                 practice,
+                bot_difficulty: BotDifficulty::Easy,
                 ends_at: 0,
                 winner_team: None,
                 reason: String::new(),
@@ -206,6 +207,8 @@ impl World {
                 p.private.resource = 100;
                 p.private.gcd_until = 0;
                 p.private.cooldowns.clear();
+                p.private.charges.clear();
+                p.private.chain = ChainView::default();
                 p.private.lockouts.clear();
                 p.root_stage = 0;
                 p.root_reset = 0;

@@ -1,0 +1,8 @@
+Kenney Mini Arena 1.1
+Author: Kenney (kenney.nl)
+License: CC0-1.0 (see LICENSE.txt)
+Source: https://kenney.nl/assets/mini-arena
+Archive: https://kenney.nl/media/pages/assets/mini-arena/88f977a0cb-1709220730/kenney_mini-arena.zip
+Retrieved: 2026-10-17
+Archive SHA256: 514760c2bc2457027451534a0b06a23f98beece166fb11ed2321226276b83c2c
+Selected unmodified GLB models; Warshard supplies layout and authoritative collision.

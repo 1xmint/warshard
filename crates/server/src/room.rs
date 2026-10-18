@@ -20,6 +20,7 @@ pub(crate) async fn run_room(
     } else {
         World::new((*content).clone())
     };
+    world.seed_combat(uuid::Uuid::new_v4().as_u128() as u64);
     let capacity = usize::from(world.rules.config.team_size) * 2;
     let mut bot_sequences = BTreeMap::new();
     let mut sessions: HashMap<String, Session> = HashMap::new();
@@ -61,9 +62,10 @@ pub(crate) async fn run_room(
                         let id = next_id; next_id += 1;
                         if let Err(code) = world.add(id, &class_id, spawn % 2, (spawn % 2) as u8) { let _ = reply.send(Err(code)); continue; }
                         if practice && sessions.is_empty() {
+                            if class_id == "arcanist" && world.rules.config.kind == "arena" { world.rules.view.bot_difficulty = BotDifficulty::Trained; }
                             for slot in 1..capacity {
                                 let bot_id=next_id; next_id+=1;
-                                let bot_class=if (slot/2)%2==0 {"briarwarden"} else {"ashweaver"};
+                                let bot_class=if class_id == "arcanist" && world.rules.config.kind == "arena" { "arcanist" } else if (slot/2)%2==0 {"briarwarden"} else {"ashweaver"};
                                 world.add(bot_id,bot_class,slot%2,(slot%2) as u8).expect("practice slot");
                                 world.players.get_mut(&bot_id).unwrap().view.bot=true;
                                 world.rules.view.stats.get_mut(&bot_id).unwrap().bot=true;
@@ -81,6 +83,7 @@ pub(crate) async fn run_room(
                             ClientMessage::Cast { slot, target, point } => world.cast(id, slot, target, point),
                             ClientMessage::Ultimate { form } => world.ultimate(id, form.as_deref()),
                             ClientMessage::Mobility { target } => world.mobility(id,target),
+                            ClientMessage::ResetPractice { difficulty } => world.reset_practice(difficulty),
                             _ => Err("already_joined"),
                         } };
                         let _ = reply.send(result);

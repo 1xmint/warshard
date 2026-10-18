@@ -42,6 +42,9 @@ pub enum ClientMessage {
         target: Option<u32>,
     },
     LeaveMatch,
+    ResetPractice {
+        difficulty: BotDifficulty,
+    },
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -77,6 +80,8 @@ pub struct Snapshot {
     pub players: Vec<PlayerView>,
     pub areas: Vec<AreaView>,
     pub match_info: MatchView,
+    pub projectiles: Vec<ProjectileView>,
+    pub events: Vec<CombatEvent>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct MatchView {
@@ -86,6 +91,7 @@ pub struct MatchView {
     pub kind: String,
     pub team_size: u8,
     pub practice: bool,
+    pub bot_difficulty: BotDifficulty,
     pub ends_at: u32,
     pub winner_team: Option<u8>,
     pub reason: String,
@@ -130,6 +136,7 @@ pub struct PlayerView {
     pub root_until: u32,
     pub slow_until: u32,
     pub casting: Option<CastView>,
+    pub bot_action: Option<String>,
     pub private: Option<PrivateView>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -141,6 +148,8 @@ pub struct PrivateView {
     pub ack: u32,
     pub lockouts: BTreeMap<String, u32>,
     pub mobility_until: u32,
+    pub chain: ChainView,
+    pub charges: BTreeMap<String, ChargeView>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct CastView {
@@ -155,4 +164,46 @@ pub struct AreaView {
     pub pos: Pos,
     pub radius: i32,
     pub ends: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BotDifficulty {
+    #[default]
+    Easy,
+    Trained,
+    Skilled,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+pub struct ChainView {
+    pub prepared_until: u32,
+    pub ready_until: u32,
+    pub dry_streak: u8,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct ChargeView {
+    pub count: u8,
+    pub next_at: u32,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct ProjectileView {
+    pub id: u32,
+    pub owner: u32,
+    pub target: u32,
+    pub ability: String,
+    pub from: Pos,
+    pub to: Pos,
+    pub started: u32,
+    pub ends: u32,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct CombatEvent {
+    pub id: u32,
+    pub tick: u32,
+    pub source: u32,
+    pub target: Option<u32>,
+    pub ability: String,
+    pub kind: String,
+    pub amount: i32,
+    pub pos: Pos,
 }

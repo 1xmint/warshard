@@ -89,7 +89,7 @@ for (const allowLock of [true, false]) {
         ws.send(
           JSON.stringify({
             type: "join",
-            version: 3,
+            version: 4,
             room,
             class_id: "ashweaver",
             resume: null,

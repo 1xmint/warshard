@@ -23,6 +23,8 @@ pub struct Class {
     pub health: i32,
     pub color: String,
     pub mobility: Mobility,
+    #[serde(default)]
+    pub utilities: Vec<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Mobility {
@@ -61,6 +63,16 @@ pub struct Ability {
     pub gcd: u32,
     pub school: String,
     pub effects: Vec<Effect>,
+    #[serde(default)]
+    pub crit_chance: u8,
+    #[serde(default)]
+    pub chains: bool,
+    #[serde(default)]
+    pub consumes_chain: bool,
+    #[serde(default)]
+    pub projectile_step: i32,
+    #[serde(default)]
+    pub charges: u8,
 }
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, TS, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -72,6 +84,9 @@ pub enum TargetKind {
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Effect {
+    Blink {
+        distance: i32,
+    },
     Damage {
         amount: i32,
     },
@@ -139,6 +154,14 @@ impl Content {
             return Err(fail());
         }
         for class in self.classes.values() {
+            if class.utilities.len() > 2
+                || class
+                    .utilities
+                    .iter()
+                    .any(|id| !self.abilities.contains_key(id))
+            {
+                return Err(fail());
+            }
             if class.health <= 0
                 || !self.forms.contains_key(&class.base_form)
                 || class.ultimate_forms.is_empty()
@@ -189,7 +212,13 @@ impl Content {
             }
         }
         for ability in self.abilities.values() {
-            if ability.cost < 0
+            if ability.crit_chance > 100
+                || ability.charges > 3
+                || ability.projectile_step < 0
+                || ability.projectile_step > 5000
+                || (ability.projectile_step > 0 && ability.target != TargetKind::Enemy)
+                || (ability.consumes_chain && (!ability.chains || ability.cast == 0))
+                || ability.cost < 0
                 || ability.cost > 100
                 || ability.range < 0
                 || ability.range > 100_000
@@ -204,6 +233,12 @@ impl Content {
             }
             for effect in &ability.effects {
                 let valid = match effect {
+                    Effect::Blink { distance } => {
+                        *distance > 0
+                            && *distance <= 8000
+                            && ability.target == TargetKind::Own
+                            && ability.cast == 0
+                    }
                     Effect::Damage { amount } | Effect::Heal { amount } => {
                         *amount > 0 && *amount <= 100_000 && ability.target != TargetKind::Ground
                     }

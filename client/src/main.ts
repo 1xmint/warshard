@@ -1,6 +1,10 @@
+import { ArcanistUI } from "./arcanist-ui";
+import { CombatPresentation } from "./combat-presentation";
+import { spellIcon } from "./spell-icons";
 import { MouseControls } from "./controls";
 import { updateObjectives } from "./objectives";
 import "./style.css";
+import "./arcanist.css";
 import "./menus.css";
 import { ArenaRenderer } from "./renderer";
 import { Connection } from "./network";
@@ -32,6 +36,7 @@ const controls = new MouseControls(
   () => notice("Mouse lock is unavailable here; camera drag still works."),
   (x, y) => renderer.pointAt(x, y),
 );
+const combat = new CombatPresentation(renderer);
 const prediction = new Prediction();
 const keys = new Set<string>();
 let selectedClass = "briarwarden";
@@ -56,12 +61,34 @@ const menus = new Menus({
     renderer.engine.resize();
   },
 });
+const heroUI = new ArcanistUI({
+  quick: () => {
+    document
+      .querySelector<HTMLButtonElement>('[data-class="arcanist"]')!
+      .click();
+    menus.queueing("arena_1");
+    net.queue("arena_1", "arcanist", true);
+  },
+  reset: (difficulty) => {
+    keys.clear();
+    controls.release();
+    cancelPlacement();
+    net.send({ type: "reset_practice", difficulty });
+  },
+  barrier: () => cast(6),
+  sound: () => {
+    combat.muted = !combat.muted;
+    return combat.muted;
+  },
+});
 document.body.insertAdjacentHTML(
   "beforeend",
   '<aside id="battle-map" class="battle-map hidden"></aside><section id="objectives" class="objective-hud hidden"><strong id="score"></strong><span id="match-clock"></span><div id="flag-status"></div></section><button id="mobility" class="mobility-button hidden">Q · Mobility</button>',
 );
 $("#mobility").onclick = () =>
-  net.send({ type: "mobility", target: selectedTarget });
+  self()?.class_id === "arcanist"
+    ? cast(5)
+    : net.send({ type: "mobility", target: selectedTarget });
 const errors: Record<string, string> = {
   rooted: "You cannot use mobility while rooted.",
   mobility_cooldown: "Your mobility ability is recharging.",
@@ -121,7 +148,11 @@ function target(id: number | null) {
 function cast(slot: number) {
   const p = self();
   if (!p || !net.content) return;
-  const id = net.content.forms[p.form].abilities[slot];
+  const id =
+    slot < 5
+      ? net.content.forms[p.form].abilities[slot]
+      : net.content.classes[p.class_id].utilities[slot - 5];
+  if (!id) return;
   const a = net.content.abilities[id];
   if (!active()) {
     notice(errors.round_not_active);
@@ -187,7 +218,10 @@ window.addEventListener("keydown", (event) => {
     cast(Number(event.code.slice(-1)) - 1);
   else if (event.code === "KeyR") ascend();
   else if (event.code === "KeyQ")
-    net.send({ type: "mobility", target: selectedTarget });
+    self()?.class_id === "arcanist"
+      ? cast(5)
+      : net.send({ type: "mobility", target: selectedTarget });
+  else if (event.code === "KeyE" && self()?.class_id === "arcanist") cast(6);
   else if (event.code === "Escape") {
     if (placement !== null) {
       cancelPlacement();
@@ -231,6 +265,7 @@ $("#leave").onclick = () => {
   sessionStorage.removeItem("warshard.join");
   keys.clear();
   controls.release();
+  heroUI.hide();
   cancelPlacement();
   menus.main();
   $<HTMLButtonElement>("#join").disabled = false;
@@ -272,6 +307,8 @@ net.onState = (state, welcome) => {
   stateAt = performance.now();
   const p = state.players.find((p) => p.id === net.id);
   if (!p || !net.content) return;
+  combat.receive(state, net.id, welcome);
+  heroUI.update(state, net.id, net.content);
   if (welcome) {
     prediction.reset(p);
     controls.reset(p.facing);
@@ -336,6 +373,8 @@ net.onState = (state, welcome) => {
           : "Defeat. Rise again next round.",
       );
     if (previous.round !== state.round) {
+      prediction.reset(p);
+      controls.reset(p.facing);
       selectedTarget = null;
       cancelPlacement();
       log(`Round ${state.round} begins shortly.`);
@@ -429,8 +468,9 @@ function updateHud() {
         `${f.team === 0 ? "Jade" : "Ember"} flag: ${f.carrier !== null ? `carried by #${f.carrier}` : f.dropped_until ? "dropped" : "home"}`,
     )
     .join(" · ");
-  $("#mobility").textContent =
-    `Q · ${info.mobility.name}${p.private.mobility_until > tick ? " · " + Math.ceil((p.private.mobility_until - tick) / 20) + "s" : ""}`;
+  $("#mobility").textContent = info.utilities.length
+    ? `Q · ${content.abilities[info.utilities[0]].name}`
+    : `Q · ${info.mobility.name}${p.private.mobility_until > tick ? " · " + Math.ceil((p.private.mobility_until - tick) / 20) + "s" : ""}`;
   if (p.health <= 0 && p.respawn_at > tick)
     $("#phase-detail").textContent =
       `Respawn in ${Math.ceil((p.respawn_at - tick) / 20)}s`;
@@ -445,7 +485,7 @@ function updateHud() {
       button.title = tooltip(ability);
       button.dataset.slot = String(slot);
       button.setAttribute("aria-label", `${slot + 1}: ${ability.name}`);
-      button.innerHTML = `<span class="key">${slot + 1}</span><span class="ability-icon">${ability.icon}</span><span class="ability-name">${ability.name}</span><span class="cooldown-shade"></span><span class="cooldown-label"></span>`;
+      button.innerHTML = `<span class="key">${slot + 1}</span><span class="ability-icon">${spellIcon(ability.icon)}</span><span class="ability-name">${ability.name}</span><span class="cooldown-shade"></span><span class="cooldown-label"></span>`;
       button.onclick = () => cast(slot);
       $("#abilities").append(button);
     });
@@ -462,7 +502,12 @@ function updateHud() {
     const left = Math.max(
       0,
       (p.private.cooldowns[id] ?? 0) - tick,
-      p.private.gcd_until - tick,
+      a.charges > 1 && p.private.charges[id]?.count === 0
+        ? p.private.charges[id].next_at - tick
+        : 0,
+      a.effects.some((effect) => effect.kind === "blink")
+        ? 0
+        : p.private.gcd_until - tick,
     );
     const fraction = Math.min(
       1,
@@ -471,12 +516,22 @@ function updateHud() {
     button.querySelector<HTMLElement>(".cooldown-shade")!.style.transform =
       `scaleY(${fraction})`;
     button.querySelector(".cooldown-label")!.textContent =
-      left > 20 ? String(Math.ceil(left / 20)) : "";
+      a.charges > 1
+        ? `${p.private.charges[id]?.count ?? a.charges}/${a.charges}`
+        : left > 20
+          ? String(Math.ceil(left / 20))
+          : "";
     button.classList.toggle(
       "unavailable",
       left > 0 || p.private.resource < a.cost || !active(),
     );
     button.classList.toggle("placing", placement === slot);
+    button.classList.toggle(
+      "proc-ready",
+      p.class_id === "arcanist" &&
+        slot === 3 &&
+        p.private.chain.ready_until > tick,
+    );
   }
   $("#ult-energy").textContent =
     p.form_until > tick
@@ -511,6 +566,7 @@ setInterval(() => {
 }, 50);
 renderer.engine.runRenderLoop(() => {
   controls.renderCursor();
+  combat.render();
   renderer.render(
     net.id,
     status === "CONNECTED" ? prediction.pos : null,

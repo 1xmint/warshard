@@ -1,3 +1,5 @@
+import { ArenaArt } from "./arena-art";
+import { CharacterModels, type CharacterVisual } from "./character-models";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
@@ -25,11 +27,15 @@ type Actor = {
   lastPos: Vector3;
   health: number;
   flash: number;
+  visual: CharacterVisual | null;
+  labelHtml: string;
 };
 export class ArenaRenderer {
   readonly engine: Engine;
   readonly scene: Scene;
   readonly camera: ArcRotateCamera;
+  private models: CharacterModels;
+  private arenaArt: ArenaArt;
   private actors = new Map<number, Actor>();
   private areaMeshes = new Map<number, Mesh>();
   private materials = new Map<string, StandardMaterial>();
@@ -51,6 +57,8 @@ export class ArenaRenderer {
     });
     this.engine.setHardwareScalingLevel(Math.max(1, devicePixelRatio / 1.5));
     this.scene = new Scene(this.engine);
+    this.models = new CharacterModels(this.scene);
+    this.arenaArt = new ArenaArt(this.scene);
     this.scene.clearColor = new Color4(0.035, 0.065, 0.083, 1);
     this.scene.fogMode = Scene.FOGMODE_EXP2;
     this.scene.fogDensity = 0.012;
@@ -125,6 +133,24 @@ export class ArenaRenderer {
         }
       : null;
     this.onPick(id, point);
+  }
+  project(pos: Pos, height = 2.5) {
+    const screen = Vector3.Project(
+      new Vector3(pos.x / 1000, height, pos.z / 1000),
+      Matrix.IdentityReadOnly,
+      this.scene.getTransformMatrix(),
+      this.camera.viewport.toGlobal(
+        this.engine.getRenderWidth(),
+        this.engine.getRenderHeight(),
+      ),
+    );
+    return {
+      x: (screen.x * this.canvas.clientWidth) / this.engine.getRenderWidth(),
+      y: (screen.y * this.canvas.clientHeight) / this.engine.getRenderHeight(),
+    };
+  }
+  cue(id: number, melee: boolean) {
+    this.actors.get(id)?.visual?.cue(melee);
   }
   private resize() {
     this.engine.resize();
@@ -219,7 +245,7 @@ export class ArenaRenderer {
           x,
           -0.055 + n * 0.002,
           z,
-          ["#354548", "#3b4c4c", "#304144", "#3a4948", "#34484a"][n],
+          ["#404b5f", "#485468", "#354258", "#3d4a60", "#455368"][n],
         );
       }
     this.cylinder("central-dais", 7.5, 0.12, 0, 0.03, 0, "#405152");
@@ -272,6 +298,7 @@ export class ArenaRenderer {
       r.position.set(spawn.x / 1000, 0.02, spawn.z / 1000);
     }
     for (const obstacle of arena.obstacles) {
+      const before = this.scene.meshes.length;
       const x = obstacle.pos.x / 1000;
       const z = obstacle.pos.z / 1000;
       const diameter = (obstacle.radius * 2) / 1000;
@@ -297,11 +324,40 @@ export class ArenaRenderer {
       crystal.scaling.y = 1.8;
       crystal.material = this.material("#98c6b6", true);
       crystal.isPickable = false;
+      if (arena.half_x === 14000)
+        for (const mesh of this.scene.meshes.slice(before))
+          mesh.metadata = { arenaPlaceholder: true };
     }
-    this.box("underworld", 90, 0.1, 90, 0, -1.1, 0, "#0d2029");
+    this.box("underworld", 90, 0.1, 90, 0, -1.5, 0, "#0d1729");
+    // Static stonework shares materials: merge it once instead of drawing each tile.
+    const batches = new Map<StandardMaterial, Mesh[]>();
+    for (const mesh of this.scene.meshes) {
+      if (
+        !existing.has(mesh) &&
+        !mesh.metadata?.arenaPlaceholder &&
+        mesh instanceof Mesh &&
+        mesh.material instanceof StandardMaterial
+      ) {
+        mesh.computeWorldMatrix(true);
+        const group = batches.get(mesh.material) ?? [];
+        group.push(mesh);
+        batches.set(mesh.material, group);
+      }
+    }
+    for (const group of batches.values()) {
+      if (group.length > 1) {
+        const merged = Mesh.MergeMeshes(group, true, true);
+        if (merged) merged.isPickable = false;
+      }
+    }
     this.court = new TransformNode("court", this.scene);
     for (const mesh of this.scene.meshes)
       if (!existing.has(mesh)) mesh.parent = this.court;
+    void this.arenaArt
+      .decorate(this.court, arena)
+      .catch((error) =>
+        console.warn("Arena art unavailable; using procedural fallback", error),
+      );
   }
   configure(content: Content) {
     this.content = content;
@@ -316,6 +372,7 @@ export class ArenaRenderer {
     if (reset) {
       this.frames = [];
       for (const actor of this.actors.values()) {
+        actor.visual?.dispose();
         actor.root.dispose(false);
         actor.label.remove();
       }
@@ -489,7 +546,24 @@ export class ArenaRenderer {
       lastPos: new Vector3(),
       health: player.health,
       flash: 0,
+      visual: null as CharacterVisual | null,
+      labelHtml: "",
     };
+    void this.models
+      .attach(root, player.id, melee)
+      .then((visual) => {
+        if (!visual) return;
+        actor.visual = visual;
+        body.setEnabled(false);
+        label.dataset.model = "kaykit";
+      })
+      .catch((error) => {
+        label.dataset.model = "fallback";
+        console.warn(
+          "Character model unavailable; using procedural fallback",
+          error,
+        );
+      });
     root.position.set(player.pos.x / 1000, 0, player.pos.z / 1000);
     this.actors.set(player.id, actor);
     return actor;
@@ -569,6 +643,12 @@ export class ArenaRenderer {
           (pos.z / 1000 - actor.root.position.z) * (p.id === localId ? 0.5 : 1);
         const moved =
           Vector3.DistanceSquared(actor.root.position, actor.lastPos) > 0.00001;
+        actor.visual?.update(
+          moved,
+          !!p.casting,
+          p.health <= 0,
+          p.form_until > latest.tick,
+        );
         actor.root.rotation.y =
           (p.id === localId ? facing : p.facing / 1000) + Math.PI;
         actor.body.position.y = moved
@@ -618,10 +698,15 @@ export class ArenaRenderer {
         const carrying = latest.match_info.flags.some(
           (f) => f.carrier === p.id,
         );
-        actor.label.innerHTML = `${name} #${p.id}${p.bot ? " [BOT]" : p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%;background:${p.team === 0 ? "#6ad9bb" : "#e49b73"}"></i></span>${carrying ? '<b class="flag-carrier">⚑ FLAG CARRIER</b>' : ""}${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
+        const labelHtml = `${name} #${p.id}${p.bot ? " [BOT]" : p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%;background:${p.team === 0 ? "#6ad9bb" : "#e49b73"}"></i></span>${carrying ? '<b class="flag-carrier">⚑ FLAG CARRIER</b>' : ""}${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
+        if (actor.labelHtml !== labelHtml) {
+          actor.label.innerHTML = labelHtml;
+          actor.labelHtml = labelHtml;
+        }
       }
       for (const [id, actor] of this.actors)
         if (!latest.players.some((p) => p.id === id)) {
+          actor.visual?.dispose();
           actor.root.dispose(false);
           actor.label.remove();
           this.actors.delete(id);

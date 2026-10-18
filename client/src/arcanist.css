@@ -1,0 +1,140 @@
+#arcanist-duel {
+  border-color: #d6af6a;
+  color: #ffdd9b;
+  background: linear-gradient(120deg, #503b2b, #1c3339);
+}
+.arcanist-card strong {
+  color: #f4b96b;
+  font-size: 50px;
+}
+.ability-icon svg {
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 0 7px #d7763c66);
+}
+.proc-banner {
+  position: fixed;
+  bottom: 230px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 580px;
+  text-align: center;
+  color: #beaf94;
+  background: #0b1721df;
+  border: 1px solid #66513b;
+  border-radius: 5px;
+  padding: 11px 18px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  z-index: 6;
+}
+.proc-banner.prepared {
+  border-color: #e5a357;
+  color: #f6c789;
+}
+.proc-banner.ready {
+  border-color: #ffe0a3;
+  color: #fff0bd;
+  box-shadow: 0 0 24px #f6b75544;
+  background: #503725e8;
+}
+.ability.proc-ready {
+  border-color: #ffe6a6;
+  box-shadow:
+    0 0 15px #efb35688,
+    inset 0 0 16px #ffca5d55;
+}
+.duel-controls {
+  position: fixed;
+  top: 275px;
+  right: 25px;
+  width: 220px;
+  padding: 13px;
+  background: #0b1922df;
+  border: 1px solid #4b5950;
+  z-index: 10;
+  border-radius: 6px;
+}
+.duel-controls button {
+  border: 1px solid #53605a;
+  border-radius: 3px;
+  background: #1b2c31;
+  padding: 8px;
+  font-size: 11px;
+}
+.duel-controls button[aria-pressed="true"] {
+  color: #ffdfa1;
+  border-color: #dab26b;
+  background: #463b2c;
+}
+.difficulty,
+.duel-options {
+  display: flex;
+  gap: 5px;
+  margin: 9px 0;
+}
+.difficulty button {
+  flex: 1;
+  padding: 6px 3px;
+}
+#restart-duel {
+  width: 100%;
+  color: #f7d59a;
+}
+#bot-insight {
+  color: #a0b9b4;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.arcanist-barrier {
+  position: fixed;
+  right: 25px;
+  bottom: 245px;
+  padding: 12px;
+  background: #193743;
+  color: #a1e1ee;
+  border: 1px solid #629cab;
+  border-radius: 4px;
+  z-index: 6;
+}
+.combat-number {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 8;
+  pointer-events: none;
+  color: #f6d4ad;
+  font-size: 20px;
+  font-weight: 700;
+  text-shadow: 0 2px 3px #000;
+}
+.combat-number.crit {
+  color: #ffe7a0;
+  font-size: 28px;
+}
+.combat-number.interrupt {
+  color: #a7dbea;
+  font-size: 15px;
+}
+@media (max-width: 1000px) {
+  .duel-controls {
+    top: 220px;
+    width: 180px;
+    right: 12px;
+  }
+  .proc-banner {
+    bottom: 205px;
+    font-size: 10px;
+    max-width: 420px;
+  }
+}
+
+.class-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 760px) {
+  .class-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -409,7 +409,7 @@ fn root_diminishing_returns_and_mobility_are_server_owned() {
     let root = w.content.abilities["snare"].clone();
     for expected in [40, 20, 10, 0] {
         w.players.get_mut(&2).unwrap().view.root_until = 0;
-        w.resolve(1, &root, Some(2), None);
+        w.resolve(1, "snare", &root, Some(2), None);
         assert_eq!(w.players[&2].view.root_until - w.tick, expected);
     }
     assert_eq!(w.mobility(2, Some(1)), Ok(()));
