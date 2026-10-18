@@ -569,7 +569,12 @@ mod tests {
         for _ in 0..61 {
             world.step();
         }
-        world.players.get_mut(&2).unwrap().view.pos = Pos { x: -3000, z: 0 };
+        let opponent = world.players[&1].view.pos;
+        // Keep the melee interrupt in range; navigation is covered separately.
+        world.players.get_mut(&2).unwrap().view.pos = Pos {
+            x: opponent.x + 2000,
+            z: opponent.z,
+        };
         assert!(
             world
                 .snapshot(2)
