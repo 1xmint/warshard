@@ -62,6 +62,11 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   expect(own().casting!.ends - own().casting!.started).toBe(90);
   await expect(page.locator("#cast-time")).toContainText("/ 4.5s");
   await expect(page.locator(".cast-wrap")).toBeVisible();
+  // Observe countdown on the long cast; a short cast can finish between browser reads on CI.
+  const castTime = page.locator("#cast-time");
+  const secondsLeft = async () => Number((await castTime.textContent())!.split("/")[0]);
+  const remaining = await secondsLeft();
+  await expect.poll(secondsLeft).toBeLessThan(remaining);
   const castBounds = (await page.locator(".cast-bar").boundingBox())!;
   for (const utility of ["#mobility", "#arcanist-barrier"]) {
     const bounds = (await page.locator(utility).boundingBox())!;
@@ -81,10 +86,6 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   await expect.poll(() => own().casting?.ability).toBe("flare_lance");
   expect(own().casting!.ends - own().casting!.started).toBe(30);
   await expect(page.locator("#cast-time")).toContainText("/ 1.5s");
-  const castTime = page.locator("#cast-time");
-  const secondsLeft = async () => Number((await castTime.textContent())!.split("/")[0]);
-  const remaining = await secondsLeft();
-  await expect.poll(secondsLeft).toBeLessThan(remaining);
   await page.keyboard.down("KeyD");
   await expect.poll(() => own().casting).toBeNull();
   await page.keyboard.up("KeyD");
