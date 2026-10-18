@@ -31,6 +31,8 @@ export class GameCursor {
     if (this.visible !== visible) this.dirty = true;
     this.visible = visible;
     // Button transitions must hide the cursor even while a GPU frame stalls.
+    if (visible)
+      this.arrow.style.transform = `translate(${this.x}px, ${this.y}px)`;
     this.arrow.classList.toggle("hidden", !visible);
     if (!visible) this.tooltip.classList.add("hidden");
   }

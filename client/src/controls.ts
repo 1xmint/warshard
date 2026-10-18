@@ -16,6 +16,7 @@ export class MouseControls {
   private uiPressed: HTMLButtonElement | null = null;
   private denied = false;
   private savedCursor: string | null = null;
+  private dragAnchor: { x: number; y: number } | null = null;
   constructor(
     private canvas: HTMLCanvasElement,
     private camera: ArcRotateCamera,
@@ -29,6 +30,7 @@ export class MouseControls {
     const begin = (e: MouseEvent) => {
       if (!this.enabled() || (e.button !== 0 && e.button !== 2)) return;
       e.preventDefault();
+      const starting = !this.buttons;
       if (!this.buttons) {
         this.uiPressed =
           this.locked() && e.button === 0 ? this.cursor.button() : null;
@@ -38,6 +40,7 @@ export class MouseControls {
       }
       this.last = { x: e.clientX, y: e.clientY };
       if (!this.locked()) this.cursor.set(e.clientX, e.clientY);
+      if (starting) this.dragAnchor = { x: this.cursor.x, y: this.cursor.y };
       const wasRight = (this.buttons & 2) !== 0;
       this.buttons = e.buttons & 3;
       this.combined ||= this.buttons === 3;
@@ -220,6 +223,9 @@ export class MouseControls {
     this.cursor.render();
   }
   private stopDrag() {
+    if (this.locked() && this.dragAnchor)
+      this.cursor.set(this.dragAnchor.x, this.dragAnchor.y);
+    this.dragAnchor = null;
     this.buttons = 0;
     this.uiPressed = null;
     if (this.pointer !== null && this.canvas.hasPointerCapture(this.pointer))
