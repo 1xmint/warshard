@@ -45,7 +45,7 @@ export class ForestMap {
     box("forest-earth", 0, 0, 90, 75, "#24352e", -0.6, 0.6);
     // Three readable routes join the two bases. Dirt is decorative and fully walkable.
     for (const z of [-10.5, 0, 10.5]) for (let i = 0; i < 8; i++) {
-      const segment = box("dirt-lane", -hx + 3.25 + i * 6.5, z + Math.sin(i * 1.7) * 0.35, 7.2, (z === 0 ? 4.7 : 3.6) + i % 3 * 0.2, "#55462f", -0.015, 0.04);
+      const segment = box("dirt-lane", -hx + 3.25 + i * 6.5, z + Math.sin(i * 1.7) * 0.35, 7.2, (z === 0 ? 4.7 : 3.6) + i % 3 * 0.2, "#55462f", -0.015 + i * 0.0005, 0.04);
       segment.rotation.y = Math.sin(i * 2.3) * 0.035;
     }
     for (const x of [-21, 21]) {
