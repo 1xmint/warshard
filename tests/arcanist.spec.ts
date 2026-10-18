@@ -105,6 +105,7 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
       ),
     )
     .toBe(true);
+  await page.screenshot({ path: info.outputPath("arcanist-bolt.png") });
   expect(own().casting).toBeNull();
   await expect(page.locator(".cast-wrap")).toBeHidden();
   expect(own().private!.chain.ready_until).toBe(0);
