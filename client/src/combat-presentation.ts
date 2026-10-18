@@ -2,7 +2,9 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { Constants } from "@babylonjs/core/Engines/constants";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Snapshot, Pos } from "./protocol";
 import type { ArenaRenderer } from "./renderer";
 
@@ -11,10 +13,11 @@ export class CombatPresentation {
   private state: Snapshot | null = null;
   private at = 0;
   private lastEvent = 0;
-  private shots = new Map<number, { core: Mesh; trail: Mesh }>();
+  private shots = new Map<number, { core: Mesh; trail: Mesh; glow: Mesh }>();
   private bursts: { meshes: Mesh[]; born: number; life: number }[] = [];
   private numbers: { element: HTMLElement; pos: Pos; born: number }[] = [];
   private materials = new Map<string, StandardMaterial>();
+  private halo: DynamicTexture | null = null;
   private audio: AudioContext | null = null;
   private voices = 0;
   private ready = false;
@@ -71,6 +74,30 @@ export class CombatPresentation {
       this.materials.set(color, m);
     }
     return this.materials.get(color)!;
+  }
+  private glowMaterial(color: string) {
+    const key = `halo-${color}`;
+    if (!this.materials.has(key)) {
+      if (!this.halo) {
+        this.halo = new DynamicTexture("spell-halo", 64, this.renderer.scene, false);
+        const context = this.halo.getContext() as CanvasRenderingContext2D;
+        const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gradient.addColorStop(0, "rgba(255,255,255,0.65)");
+        gradient.addColorStop(0.25, "rgba(255,255,255,0.25)");
+        gradient.addColorStop(1, "rgba(255,255,255,0)");
+        context.fillStyle = gradient; context.fillRect(0, 0, 64, 64);
+        this.halo.hasAlpha = true; this.halo.update();
+      }
+      const material = new StandardMaterial(key, this.renderer.scene);
+      material.emissiveColor = Color3.FromHexString(color);
+      material.diffuseTexture = this.halo;
+      material.useAlphaFromDiffuseTexture = true;
+      material.disableLighting = true; material.disableDepthWrite = true;
+      material.alphaMode = Constants.ALPHA_ADD;
+      material.backFaceCulling = false;
+      this.materials.set(key, material);
+    }
+    return this.materials.get(key)!;
   }
   receive(state: Snapshot, localId: number, welcome: boolean) {
     this.state = state;
@@ -186,7 +213,11 @@ export class CombatPresentation {
         trail.material = this.material(sunshard ? "#ffad47" : flare ? "#f05a31" : "#de7940");
         trail.scaling.z = sunshard ? 6.5 : flare ? 8 : 4;
         trail.isPickable = false;
-        meshes = { core, trail };
+        const glow = MeshBuilder.CreatePlane(`bolt-glow-${shot.id}`, { size: sunshard ? 2.7 : flare ? 1.8 : 1.1 }, this.renderer.scene);
+        glow.material = this.glowMaterial(sunshard ? "#ffbc5c" : "#ff873f");
+        glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
+        glow.isPickable = false;
+        meshes = { core, trail, glow };
         this.shots.set(shot.id, meshes);
       }
       const target =
@@ -203,12 +234,14 @@ export class CombatPresentation {
         mesh.position.copyFrom(position);
         mesh.lookAt(end);
       }
+      meshes.glow.position.copyFrom(position);
       meshes.trail.position.subtractInPlace(end.subtract(start).normalize().scale(shot.ability === "sunshard" ? 0.55 : 0.35));
     }
     for (const [id, mesh] of this.shots)
       if (!visibleShots.some((p) => p.id === id)) {
         mesh.core.dispose();
         mesh.trail.dispose();
+        mesh.glow.dispose();
         this.shots.delete(id);
       }
     this.bursts = this.bursts.filter((effect) => {
