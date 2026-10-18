@@ -47,6 +47,7 @@ export class ArenaRenderer {
   private snapFocus = true;
   private ground: Mesh;
   private court: TransformNode | null = null;
+  private mapId = "shattered_court";
   private arena: Arena = initialContent.maps.shattered_court;
   private flagMeshes = new Map<number, TransformNode>();
   onPick: (id: number | null, point: Pos | null) => void = () => {};
@@ -240,7 +241,7 @@ export class ArenaRenderer {
   private buildCourt(arena: Arena) {
     this.court?.dispose(false);
     delete this.canvas.dataset.arenaArt;
-    if (arena.half_x !== 14000) {
+    if (this.mapId === "riftwood_crossing") {
       this.ground.scaling.set(arena.half_x / 14000, 1, arena.half_z / 10000);
       this.ground.material = this.material("#45513a");
       this.scene.fogColor = Color3.FromHexString("#374c40");
@@ -379,9 +380,10 @@ export class ArenaRenderer {
         console.warn("Arena art unavailable; using procedural fallback", error),
       );
   }
-  configure(content: Content) {
+  configure(content: Content, mapId: string) {
     this.content = content;
-    if (JSON.stringify(this.arena) !== JSON.stringify(content.arena)) {
+    if (this.mapId !== mapId || JSON.stringify(this.arena) !== JSON.stringify(content.arena)) {
+      this.mapId = mapId;
       this.arena = content.arena;
       this.buildCourt(this.arena);
     }
