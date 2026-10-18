@@ -48,14 +48,12 @@ export class MouseControls {
       this.showCursor();
     };
     canvas.addEventListener("pointerdown", (e) => {
-      if (
-        this.locked() ||
-        !this.enabled() ||
-        (e.button !== 0 && e.button !== 2)
-      )
+      if (!this.enabled() || (e.button !== 0 && e.button !== 2))
         return;
-      this.pointer = e.pointerId;
-      canvas.setPointerCapture(e.pointerId);
+      if (!this.locked()) {
+        this.pointer = e.pointerId;
+        canvas.setPointerCapture(e.pointerId);
+      }
       begin(e);
     });
     canvas.addEventListener("mousedown", begin);
@@ -102,7 +100,13 @@ export class MouseControls {
       if (this.buttons & 2) this.faceCamera();
     };
     canvas.addEventListener("pointermove", (e) => {
-      if (document.pointerLockElement !== canvas) move(e);
+      if (!this.locked()) move(e);
+      // Pointer Events report mouse-button chords as pointermove transitions.
+      // Babylon can suppress compatibility mouse events on some platforms.
+      else if ((e.buttons & 3) !== this.buttons && e.button >= 0) {
+        if ((e.buttons & 3) & ~this.buttons) begin(e);
+        else end(e);
+      }
     });
     canvas.addEventListener("mousemove", (e) => {
       if (document.pointerLockElement === canvas) move(e);
@@ -129,7 +133,7 @@ export class MouseControls {
       }
     };
     canvas.addEventListener("pointerup", (e) => {
-      if (document.pointerLockElement !== canvas) end(e);
+      end(e);
     });
     document.addEventListener("mouseup", (e) => {
       if (document.pointerLockElement === canvas || e.buttons) end(e);
