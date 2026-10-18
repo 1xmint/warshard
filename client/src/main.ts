@@ -47,6 +47,8 @@ let currentForm = "";
 let previous: Snapshot | null = null;
 let noticeUntil = 0;
 let stateAt = 0;
+let castInterruptedUntil = 0;
+let lastInterruptEvent = 0;
 let roomName = "";
 const help = $<HTMLDialogElement>("#help");
 const menus = new Menus({
@@ -307,6 +309,20 @@ net.onState = (state, welcome) => {
   stateAt = performance.now();
   const p = state.players.find((p) => p.id === net.id);
   if (!p || !net.content) return;
+  if (welcome) {
+    castInterruptedUntil = 0;
+    lastInterruptEvent = state.events.at(-1)?.id ?? 0;
+  }
+  for (const event of state.events) {
+    if (
+      event.id > lastInterruptEvent &&
+      event.kind === "interrupt" &&
+      event.target === net.id
+    )
+      castInterruptedUntil = performance.now() + 700;
+    lastInterruptEvent = Math.max(lastInterruptEvent, event.id);
+  }
+  if (p.casting || state.phase !== "active") castInterruptedUntil = 0;
   combat.receive(state, net.id, welcome);
   heroUI.update(state, net.id, net.content);
   if (welcome) {
@@ -577,13 +593,26 @@ renderer.engine.runRenderLoop(() => {
   if (performance.now() > noticeUntil) $("#notice").textContent = "";
   const p = self();
   const cast = p?.casting;
-  $(".cast-wrap").classList.toggle("visible", !!cast);
+  const interrupted = performance.now() < castInterruptedUntil;
+  $(".cast-wrap").classList.toggle("visible", !!cast || interrupted);
+  $(".cast-wrap").classList.toggle("interrupted", interrupted);
   if (cast && net.content && net.state) {
     const tick =
       net.state.tick + Math.min(2, (performance.now() - stateAt) / 50);
+    const total = Math.max(1, cast.ends - cast.started);
+    const progress = Math.min(1, Math.max(0, (tick - cast.started) / total));
+    const remaining = Math.max(0, (cast.ends - tick) / 20);
     $("#cast-label").textContent = net.content.abilities[cast.ability].name;
-    $("#cast-progress").style.width =
-      `${Math.min(100, Math.max(0, ((tick - cast.started) / (cast.ends - cast.started)) * 100))}%`;
+    $("#cast-time").textContent = `${remaining.toFixed(1)} / ${(total / 20).toFixed(2).replace(/0$/, "")}s`;
+    $("#cast-progress").style.transform = `scaleX(${progress})`;
+    $(".cast-bar").setAttribute("aria-valuenow", String(Math.round(progress * 100)));
+    $(".cast-bar").setAttribute("aria-label", `${net.content.abilities[cast.ability].name}, ${remaining.toFixed(1)} seconds remaining`);
+  } else if (interrupted) {
+    $("#cast-label").textContent = "Interrupted";
+    $("#cast-time").textContent = "";
+    $("#cast-progress").style.transform = "scaleX(1)";
+    $(".cast-bar").setAttribute("aria-valuenow", "0");
+    $(".cast-bar").setAttribute("aria-label", "Cast interrupted");
   }
 });
 

@@ -1,5 +1,10 @@
 # Warshard state
 
+## Cast bar — 2026-10-18
+- Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. Cinder Dart remains the instant mobile attack.
+- Player cast bar shows the spell name, remaining/total seconds and a smooth fill driven by authoritative cast start/end ticks. Confirmed interrupts briefly turn it red. Instant spells do not create a fake cast bar.
+- KayKit's existing CC0 casting clips remain the compatible character-animation source. Kenney Particle Pack is a verified CC0 option for future particle textures, not an imported ready-made spell system.
+
 ## Hotbar readability — 2026-10-18
 - Cooldowns use prominent numeric countdowns, including tenths for the final second; charge counts have a separate corner badge. Instant Sunshard has a pulsing gold border and sparks, with reduced-motion support.
 - KayKit model orientation is corrected at the imported-model wrapper, preserving simulation facing and fallback-rig orientation.

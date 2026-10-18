@@ -259,12 +259,14 @@ mod tests {
     #[test]
     fn spellstorm_enhances_the_same_kit_and_expires_without_a_stuck_cast() {
         let mut world = duel();
+        assert_eq!(world.content.abilities["flare_lance"].cast, 30);
+        assert_eq!(world.content.abilities["sunshard"].cast, 90);
         world.players.get_mut(&1).unwrap().private.energy = 100;
         world.ultimate(1, None).unwrap();
         let expires = world.players[&1].view.form_until;
         world.cast(1, 1, Some(2), None).unwrap();
         let cast = world.players[&1].cast.as_ref().unwrap();
-        assert_eq!(cast.view.ends - cast.view.started, 16);
+        assert_eq!(cast.view.ends - cast.view.started, 15);
         let remaining = expires - world.tick;
         wait(&mut world, remaining);
         assert_eq!(world.players[&1].view.form, "arcanist");
@@ -272,7 +274,7 @@ mod tests {
         assert!(world.players[&1].cast.is_none());
         world.cast(1, 3, Some(2), None).unwrap();
         let cast = world.players[&1].cast.as_ref().unwrap();
-        assert_eq!(cast.view.ends - cast.view.started, 60);
+        assert_eq!(cast.view.ends - cast.view.started, 90);
     }
     #[test]
     fn two_crits_bank_one_instant_and_projectile_crit_restarts_the_chain() {

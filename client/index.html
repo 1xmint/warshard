@@ -69,8 +69,11 @@
     <div id="notice" role="status"></div>
     <footer class="hud hidden" id="hud">
       <div class="cast-wrap">
-        <span id="cast-label"></span>
-        <div class="cast-bar"><div id="cast-progress"></div></div>
+        <div class="cast-bar" role="progressbar" aria-label="Spell cast" aria-valuemin="0" aria-valuemax="100">
+          <div id="cast-progress"></div>
+          <span id="cast-label"></span>
+          <span id="cast-time"></span>
+        </div>
       </div>
       <div class="ability-row">
         <div class="kit">
