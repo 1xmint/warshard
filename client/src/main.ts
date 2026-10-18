@@ -413,7 +413,7 @@ function tooltip(a: Ability, id: string) {
     riftstep: "Blink to reposition or escape.",
     prism_ward: "Instant shield. Off the global cooldown and does not interrupt your current cast.",
     crownfall: "Stationary cast. Locks the enemy's position at completion; the meteor lands after a short descent and hits a small area.",
-    unweave: "Instant interrupt. Stops an enemy cast and briefly locks their spell school.",
+    unweave: "Sunderflare is an instant arcane lash that deals damage and slows. If it catches a cast, it interrupts and locks that spell school.",
     glasswake: "Instant self-centered burst that roots nearby enemies.",
   };
   const castTime = a.cast ? `${a.cast / 20}s cast${a.cast_while_moving ? " · can move" : " · stationary"}` : "Instant";
@@ -520,7 +520,7 @@ function updateHud() {
       button.title = tooltip(ability, id);
       button.dataset.slot = String(slot);
       button.setAttribute("aria-label", `${key}: ${ability.name}`);
-      button.innerHTML = `<span class="key">${key}</span><span class="ability-icon">${spellIcon(ability.icon)}</span><span class="ability-name">${ability.name}</span><span class="gcd-shade"></span><span class="cooldown-shade"></span><span class="cooldown-label"></span><span class="charge-count"></span>`;
+      button.innerHTML = `<span class="key">${key}</span><span class="ability-icon">${spellIcon(ability.icon, id)}</span><span class="ability-name">${ability.name}</span><span class="gcd-shade"></span><span class="cooldown-shade"></span><span class="cooldown-label"></span><span class="charge-count"></span>`;
       button.onclick = () => cast(slot);
       $(slot < 5 ? "#abilities" : "#utility-abilities").append(button);
     };
