@@ -1,5 +1,10 @@
 # Warshard state
 
+## Hotbar readability — 2026-10-18
+- Cooldowns use prominent numeric countdowns, including tenths for the final second; charge counts have a separate corner badge. Instant Sunshard has a pulsing gold border and sparks, with reduced-motion support.
+- KayKit model orientation is corrected at the imported-model wrapper, preserving simulation facing and fallback-rig orientation.
+- Arcanist milestone #9 is merged and passed all eleven browser scenarios plus combat/build checks. This follow-up uses the same CI checks.
+
 ## Decisions — 2026-10-17
 - Priority changed from expanding modes to one polished Arcanist and intelligent, adjustable solo duels. Preserve Briarwarden, Ashweaver, maps and battleground work; defer progression and talent/equipment systems.
 - Arcanist: mobile pressure, deliberate casts, a bankable two-crit preparation/payoff loop with a guaranteed-crit cooldown and bad-luck protection. One Spellstorm Ascension; Q interrupt, E barrier, five primary skills including blink. Original spell names and presentation.

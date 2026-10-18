@@ -39,6 +39,8 @@ export class CharacterModels {
     );
     const wrapper = new TransformNode(`model-${id}`, this.scene);
     wrapper.parent = parent;
+    // KayKit faces the opposite direction to the procedural fallback rig.
+    wrapper.rotation.y = Math.PI;
     for (const root of instance.rootNodes) root.parent = wrapper;
     const hide = new Set(
       melee

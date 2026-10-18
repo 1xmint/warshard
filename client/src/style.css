@@ -556,17 +556,32 @@ h1 {
   position: absolute;
   inset: 0;
   background: #020b12bd;
-  transform-origin: bottom;
+  opacity: 0;
   pointer-events: none;
 }
+.ability.counting-down .cooldown-shade { opacity: 1; }
 .cooldown-label {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 20px;
-  color: #f0e0bd;
-  text-shadow: 0 1px 4px #000;
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff6dc;
+  text-shadow: 0 2px 5px #000, 0 0 3px #000;
+  z-index: 3;
+  pointer-events: none;
+}
+.charge-count {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  z-index: 4;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff2c4;
+  text-shadow: 0 1px 3px #000;
   pointer-events: none;
 }
 .ability.placing {
