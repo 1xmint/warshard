@@ -234,5 +234,6 @@ export class ForestMap {
     data.normals = []; VertexData.ComputeNormals(positions, indices, data.normals); data.applyToMesh(mesh, false);
     const material = new StandardMaterial("forest-grass", this.scene); material.backFaceCulling = false; material.specularColor = Color3.Black();
     mesh.material = material;
+    mesh.onDisposeObservable.add(() => material.dispose());
   }
 }
