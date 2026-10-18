@@ -8,10 +8,10 @@
 - Tests run on GitHub CI; only scoped compile/lint work runs on Josh's PC.
 
 ## Current state
-- Existing online 3D combat and team/CTF practice are on PR #7, stacked on foundation PR #6. New Arcanist work starts from #7 in codex/arcanist-duels.
+- Foundation PR #6 is merged. PR #9 targets main and includes all of PR #7's team/CTF practice and controls work, plus the Arcanist milestone; #7 can be closed as superseded after #9 passes and lands.
 - WoW-style steering and session-held cursor capture work in Josh's Brave browser. Cursor event work is batched per display frame. Slight lag was reported; Brave FPS/network latency are not measured.
-- PR #7's Linux cursor chord regression was fixed by recognizing Pointer Events chord transitions; the next run reached the suite-wide five-minute limit without an assertion failure. Suite budget is now ten minutes (individual checks unchanged). Foundation #6 previously passed CI.
-- Arcanist simulation, charge/proc/projectile events, adjustable bot decisions, quick duels, HUD feedback, synthesized sound and licensed art are implemented on the milestone branch. Scoped compile/lint checks pass; CI scenarios and playable visual review are pending. Do not describe it as proven fun.
+- PR #7's Linux cursor chord regression was fixed by recognizing Pointer Events chord transitions. CI subsequently exposed slow-browser five-second setup waits and the former five-minute suite limit; the combined branch must prove these flows before integration. Suite budget is ten minutes.
+- Arcanist simulation, charge/proc/projectile events, adjustable bot decisions, quick duels, HUD feedback, synthesized sound and licensed art are implemented. Scoped compile/lint checks and CI's simulation/build stage pass. Live browser review confirmed loaded animated mages, tiled court, columns, walls and difficulty/reset/menu controls. Final browser regression checks remain pending; fun and balance require Josh's playtest.
 
 ## Next slices
 1. Run CI, resolve correctness/browser regressions, inspect the recorded Arcanist art/flow.
