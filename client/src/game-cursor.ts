@@ -30,6 +30,9 @@ export class GameCursor {
   show(visible: boolean) {
     if (this.visible !== visible) this.dirty = true;
     this.visible = visible;
+    // Button transitions must hide the cursor even while a GPU frame stalls.
+    this.arrow.classList.toggle("hidden", !visible);
+    if (!visible) this.tooltip.classList.add("hidden");
   }
 
   /** Coalesce high-frequency mouse events into the existing display frame. */

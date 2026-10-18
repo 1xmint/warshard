@@ -13,6 +13,7 @@
 - PR #7's Linux cursor chord regression was fixed by recognizing Pointer Events chord transitions. CI subsequently exposed slow-browser five-second setup waits and the former five-minute suite limit; the combined branch must prove these flows before integration. Suite budget is ten minutes.
 - Arcanist simulation, charge/proc/projectile events, adjustable bot decisions, quick duels, HUD feedback, synthesized sound and licensed art are implemented. Scoped compile/lint checks, CI's simulation/build stage and Arcanist browser flow (including earned Spellstorm) pass. Live review confirmed animated mages, tiled court, columns, walls and difficulty/reset/menu controls. PR #9 owns final integration evidence; fun and balance require Josh's playtest.
 - Browser evidence exposed reused movement sequence numbers after reset; these now remain monotonic within a session. Rendering pauses during connection/recovery and in hidden tabs so expensive GPU work does not compete with handshakes. Startup/recovery assertions retain their outcomes with bounded software-GPU allowances.
+- Saved render quality now applies during graphics startup. CI exercises the shipped low-resolution setting rather than oversubscribing software graphics with two full-resolution clients. Initial camera focus snaps to the player; cursor visibility reacts immediately to button transitions, while motion/picking remain batched.
 
 ## Next slices
 1. Run CI, resolve correctness/browser regressions, inspect the recorded Arcanist art/flow.

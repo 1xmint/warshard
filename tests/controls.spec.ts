@@ -58,6 +58,15 @@ for (const allowLock of [true, false]) {
           );
       });
     await page.addInitScript(() => {
+      const events: object[] = [];
+      for (const type of ["pointerdown", "pointerup", "mousedown", "mouseup", "pointercancel"])
+        document.addEventListener(type, (event) => {
+          const e = event as MouseEvent;
+          events.push({ type, button: e.button, buttons: e.buttons,
+            target: (e.target as HTMLElement)?.id, lock: document.pointerLockElement?.id });
+          if (events.length > 24) events.shift();
+          document.documentElement.dataset.testMouse = JSON.stringify(events);
+        }, true);
       const native = HTMLCanvasElement.prototype.requestPointerLock;
       HTMLCanvasElement.prototype.requestPointerLock = function () {
         document.documentElement.dataset.lockRequests = String(
@@ -179,7 +188,7 @@ for (const allowLock of [true, false]) {
       const anchor = await cursor.boundingBox();
       for (let n = 0; n < 3; n++) {
         await page.mouse.down({ button: "right" });
-        await expect(cursor).toBeHidden();
+        await expect(cursor, await page.locator("html").getAttribute("data-test-mouse") ?? "mouse events").toBeHidden();
         await page.mouse.up({ button: "right" });
         await expect(cursor).toBeVisible();
         expect(await cursor.boundingBox()).toEqual(anchor);

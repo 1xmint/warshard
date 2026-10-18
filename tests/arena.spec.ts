@@ -49,6 +49,7 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
   });
+  await context.addInitScript(() => localStorage.setItem("warshard.quality", "2"));
   const a = await context.newPage();
   const b = await context.newPage();
   const runtimeErrors: string[] = [];

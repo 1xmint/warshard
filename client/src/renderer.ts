@@ -42,6 +42,7 @@ export class ArenaRenderer {
   private placement: Mesh;
   private content: Content | null = null;
   private frames: { state: Snapshot; at: number }[] = [];
+  private snapFocus = true;
   private ground: Mesh;
   private court: TransformNode | null = null;
   private arena: Arena = initialContent.maps.shattered_court;
@@ -55,7 +56,12 @@ export class ArenaRenderer {
       stencil: true,
       preserveDrawingBuffer: false,
     });
-    this.engine.setHardwareScalingLevel(Math.max(1, devicePixelRatio / 1.5));
+    const quality = Number(localStorage.getItem("warshard.quality"));
+    this.engine.setHardwareScalingLevel(
+      [1, 1.5, 2].includes(quality)
+        ? quality
+        : Math.max(1, devicePixelRatio / 1.5),
+    );
     this.scene = new Scene(this.engine);
     this.models = new CharacterModels(this.scene);
     this.arenaArt = new ArenaArt(this.scene);
@@ -370,6 +376,7 @@ export class ArenaRenderer {
   }
   receive(state: Snapshot, reset: boolean) {
     if (reset) {
+      this.snapFocus = true;
       this.frames = [];
       for (const actor of this.actors.values()) {
         actor.visual?.dispose();
@@ -580,8 +587,10 @@ export class ArenaRenderer {
       const local = latest.players.find((p) => p.id === localId);
       if (local) {
         const focus = predicted ?? local.pos;
-        this.camera.target.x += (focus.x / 1000 - this.camera.target.x) * 0.15;
-        this.camera.target.z += (focus.z / 1000 - this.camera.target.z) * 0.15;
+        const follow = this.snapFocus ? 1 : 0.15;
+        this.camera.target.x += (focus.x / 1000 - this.camera.target.x) * follow;
+        this.camera.target.z += (focus.z / 1000 - this.camera.target.z) * follow;
+        this.snapFocus = false;
       }
       // Labels and picking must use this frame's orbit/follow transform.
       this.scene.updateTransformMatrix();

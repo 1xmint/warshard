@@ -57,6 +57,9 @@ export class MouseControls {
       begin(e);
     });
     canvas.addEventListener("mousedown", begin);
+    document.addEventListener("mousedown", (e) => {
+      if (this.locked()) begin(e);
+    }, true);
 
     const move = (e: MouseEvent) => {
       if (!this.enabled()) {
@@ -64,7 +67,7 @@ export class MouseControls {
         return;
       }
       if (!this.locked()) this.cursor.set(e.clientX, e.clientY);
-      if (!this.buttons || !(e.buttons & 3)) {
+      if (!this.buttons || (!this.locked() && !(e.buttons & 3))) {
         this.stopDrag();
         if (this.locked())
           this.cursor.set(
@@ -75,7 +78,9 @@ export class MouseControls {
         return;
       }
       const wasRight = (this.buttons & 2) !== 0;
-      this.buttons = e.buttons & 3;
+      // Locked relative-motion packets may carry stale button bits. Explicit
+      // down/up events and Pointer Events chord transitions own that state.
+      if (!this.locked()) this.buttons = e.buttons & 3;
       if (this.buttons & 2 && !wasRight) {
         this.faceCamera();
         this.lock();
