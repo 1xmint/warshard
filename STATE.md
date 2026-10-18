@@ -1,5 +1,17 @@
 # Warshard state
 
+## PvP experience roadmap — 2026-10-18
+Josh authorized a cohesive low-resolution fantasy PvP overhaul, preserving menu-to-match entry and exactly two maps. The identity/assets remain original or licensed; WoW is a controls/readability/pacing reference, not a map or asset source. No accounts, progression or new modes in this pass.
+1. Combat baseline: complete cast-bar validation, consistent targeting and enemy cast feedback. Prove short/long/instant casts, interrupts, movement and repeated duels through existing authoritative scenarios and browser flows.
+2. Maps: authored stone-ruin arena and two-base forest CTF battleground, sharing a cohesive palette and licensed art. Visible cover must match server collision/LOS; walkable routes and flag objectives remain clear. Prove navigation, cover, both map loads and bot/objective play.
+3. Spell/readability pass: differentiated bolts/trails/impacts and Spellstorm, coherent combat UI, bounded effect counts and optional quality. Prove existing two-player and battleground flows, inspect real screenshots/client presentation. PvP balance, fun and low-end performance remain playtest/measurement outcomes.
+Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no rewrite or new infrastructure is justified. Current phase: 1; PR #11 has a browser failure after movement cancellation to investigate before integration.
+
+## Cast bar — 2026-10-18
+- Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. Cinder Dart remains the instant mobile attack.
+- Player cast bar shows the spell name, remaining/total seconds and a smooth fill driven by authoritative cast start/end ticks. Confirmed interrupts briefly turn it red. Instant spells do not create a fake cast bar.
+- KayKit's existing CC0 casting clips remain the compatible character-animation source. Kenney Particle Pack is a verified CC0 option for future particle textures, not an imported ready-made spell system.
+
 ## Hotbar readability — 2026-10-18
 - Cooldowns use prominent numeric countdowns, including tenths for the final second; charge counts have a separate corner badge. Instant Sunshard has a pulsing gold border and sparks, with reduced-motion support.
 - KayKit model orientation is corrected at the imported-model wrapper, preserving simulation facing and fallback-rig orientation.

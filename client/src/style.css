@@ -636,7 +636,7 @@ kbd {
   margin-right: 4px;
 }
 .cast-wrap {
-  height: 35px;
+  height: 32px;
   text-align: center;
   margin: 0 50px 10px 0;
   visibility: hidden;
@@ -645,19 +645,45 @@ kbd {
   visibility: visible;
 }
 #cast-label {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: #decc9e;
+  position: absolute;
+  left: 10px;
+  top: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff4d2;
+  text-shadow: 0 1px 3px #000;
+}
+#cast-time {
+  position: absolute;
+  right: 10px;
+  top: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff4d2;
+  text-shadow: 0 1px 3px #000;
 }
 .cast-bar {
-  height: 5px;
-  background: #0d1a21;
-  border: 1px solid #a99c5f44;
-  margin-top: 8px;
+  position: relative;
+  height: 31px;
+  background: #071119ed;
+  border: 1px solid #d5b570;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 14px #d8983433, inset 0 0 5px #000;
 }
-.cast-bar > div {
+#cast-progress {
+  width: 100%;
   height: 100%;
-  background: #cfb57b;
+  background: linear-gradient(0deg, #8b5924, #d2a952 55%, #f2d28a);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+.cast-wrap.interrupted .cast-bar {
+  border-color: #ee837a;
+}
+.cast-wrap.interrupted #cast-progress {
+  background: #8d302a;
 }
 #notice {
   position: fixed;
@@ -842,3 +868,7 @@ dialog p {
     font-size: 25px;
   }
 }
+
+.target-cast { position: relative; height: 20px; margin-top: 5px; border: 1px solid #c1a269; background: #101217; overflow: hidden; }
+#target-cast-progress { height: 100%; background: linear-gradient(#d2aa62, #885523); transform-origin: left; }
+#target-cast-label { position: absolute; inset: 2px 6px; font-size: 11px; color: #fff2d2; text-shadow: 0 1px 2px #000; }

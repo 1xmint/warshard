@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import type { ServerMessage, Snapshot } from "../client/src/protocol";
+import type { ClientMessage, ServerMessage, Snapshot } from "../client/src/protocol";
 
 test("Arcanist quick duel: licensed models, critical chain, instant payoff, barrier, blink and repeatable difficulty", async ({
   page,
@@ -7,6 +7,7 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   test.setTimeout(120_000);
   let state: Snapshot | null = null,
     id = 0;
+  let lastSteer: Extract<ClientMessage, { type: "steer" }> | null = null;
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("websocket", (socket) =>
@@ -20,6 +21,10 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
       if (message.type === "error") errors.push(message.code);
     }),
   );
+  page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {
+    const message = JSON.parse(String(payload)) as ClientMessage;
+    if (message.type === "steer") lastSteer = message;
+  }));
   const own = () => state!.players.find((p) => p.id === id)!;
   const ready = async () => {
     await expect.poll(() => state?.phase).toBe("active");
@@ -52,6 +57,37 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   await ready();
   expect(state!.match_info.bot_difficulty).toBe("easy");
   await page.keyboard.press("Tab");
+  await page.keyboard.press("Digit4");
+  await expect.poll(() => own().casting?.ability).toBe("sunshard");
+  expect(own().casting!.ends - own().casting!.started).toBe(90);
+  await expect(page.locator("#cast-time")).toContainText("/ 4.5s");
+  await expect(page.locator(".cast-wrap")).toBeVisible();
+  await page.screenshot({ path: info.outputPath("arcanist-long-cast.png") });
+  await page.keyboard.down("KeyD");
+  await expect.poll(() => own().casting).toBeNull();
+  await page.keyboard.up("KeyD");
+  await expect(page.locator(".cast-wrap")).toBeHidden();
+  // A released key must reach the authoritative movement queue before a new cast.
+  await expect.poll(() => lastSteer !== null && lastSteer.dx === 0 && lastSteer.dz === 0).toBe(true);
+  const stopSeq = lastSteer!.seq;
+  await expect.poll(() => own().private!.ack).toBeGreaterThanOrEqual(stopSeq);
+  await gcd();
+  await page.keyboard.press("Digit2");
+  await expect.poll(() => own().casting?.ability).toBe("flare_lance");
+  expect(own().casting!.ends - own().casting!.started).toBe(30);
+  await expect(page.locator("#cast-time")).toContainText("/ 1.5s");
+  const castTime = page.locator("#cast-time");
+  const secondsLeft = async () => Number((await castTime.textContent())!.split("/")[0]);
+  const remaining = await secondsLeft();
+  await expect.poll(secondsLeft).toBeLessThan(remaining);
+  await page.keyboard.down("KeyD");
+  await expect.poll(() => own().casting).toBeNull();
+  await page.keyboard.up("KeyD");
+  const castBarRound = state!.round;
+  await page.getByRole("button", { name: "Restart duel", exact: true }).click();
+  await expect.poll(() => state!.round).toBeGreaterThan(castBarRound);
+  await ready();
+  await page.keyboard.press("Tab");
   await page.keyboard.press("Digit3");
   await expect(page.locator("#proc-banner")).toContainText("KINDLING");
   await gcd();
@@ -70,6 +106,7 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
     )
     .toBe(true);
   expect(own().casting).toBeNull();
+  await expect(page.locator(".cast-wrap")).toBeHidden();
   expect(own().private!.chain.ready_until).toBe(0);
   await page.keyboard.press("KeyE");
   await expect.poll(() => own().shield).toBeGreaterThan(0);
