@@ -12,6 +12,12 @@ Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no 
 - Projectile visuals are capped at 96, impact groups at 64 and floating numbers at 32. Geometry/materials are reused where practical and expired meshes are disposed. No full-scene bloom pass was added to the shared-PC/browser budget.
 - Combat frames and hotbar share a bronze, stone and parchment palette; enemy cast progress is visible for interrupt timing. Original spell names and the existing menu entry remain. Q/E share a utility row below the cast bar; the default camera is angled lower to show character bodies.
 
+## Forest and arena (2026-10-18)
+- Riftwood Crossing has opposing Jade/Ember courtyards and three dirt routes. Rock clusters sit within visible gravel footprints matching the authoritative cover circles. Tall trees/camps stay outside the playable boundary; trees on the camera's side hide to keep combatants visible.
+- Shattered Court has a worn central floor, varied ruined walls, corner towers and existing cover pillars. Both maps retain their gameplay dimensions and server collision. The renderer selects art by authoritative map identity.
+- Selected unmodified Kenney Nature Kit CC0 models are vendored with their license, pinned official download and archive hash. Static terrain is batched by material; imported model containers are cached. Low-end rendering remains a measurement target.
+- PR #13 integrates the map work from #12 and spell/HUD presentation on merged cast-bar foundation #11; it owns final CI, screenshots and integration status.
+
 ## Cast bar — 2026-10-18
 - Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. Cinder Dart remains the instant mobile attack.
 - Player cast bar shows the spell name, remaining/total seconds and a smooth fill driven by authoritative cast start/end ticks. Confirmed interrupts briefly turn it red. Instant spells do not create a fake cast bar.
