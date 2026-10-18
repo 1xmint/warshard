@@ -149,11 +149,13 @@ impl World {
         let critical = a.crit_chance > 0
             && (self.rng % 100 < u64::from(a.crit_chance) + u64::from(bonus)
                 || ((a.chains || a.crit_embers) && p.private.chain.dry_streak >= 3));
-        p.private.embers = p
-            .private
-            .embers
-            .saturating_add(a.ember_gain + u8::from(critical && a.crit_embers))
-            .min(3);
+        if p.view.health > 0 {
+            p.private.embers = p
+                .private
+                .embers
+                .saturating_add(a.ember_gain + u8::from(critical && a.crit_embers))
+                .min(3);
+        }
         if a.crit_embers && !a.chains {
             if critical {
                 p.private.chain.dry_streak = 0;
@@ -390,6 +392,6 @@ mod tests {
         for _ in 0..20 {
             w.damage(1, 2, 100);
         }
-        assert_eq!(w.players[&1].private.energy, 4);
+        assert_eq!(w.players[&1].private.energy, 8);
     }
 }

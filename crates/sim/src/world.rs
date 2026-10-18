@@ -457,6 +457,8 @@ impl World {
             t.private.energy = (t.private.energy + (effective + absorb) / 12).min(100);
         }
         if t.view.health == 0 {
+            t.view.sun = None;
+            t.private.embers = 0;
             t.cast = None;
             t.inputs.clear();
             if self.rules.config.kind == "ctf" {
@@ -474,8 +476,8 @@ impl World {
                     s.energy_window = self.tick / 20;
                     s.energy_earned = 0;
                 }
-                let gain = ((effective + absorb) / 8).min(4 - s.energy_earned).max(0);
-                if s.view.form_until == 0 {
+                let gain = ((effective + absorb) / 8).min(8 - s.energy_earned).max(0);
+                if s.view.form_until == 0 && s.view.health > 0 {
                     s.private.energy = (s.private.energy + gain).min(100);
                     s.energy_earned += gain;
                 }

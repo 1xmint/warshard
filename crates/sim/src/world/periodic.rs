@@ -256,4 +256,41 @@ mod tests {
         world.reset_practice(BotDifficulty::Trained).unwrap();
         assert!(world.burns.is_empty());
     }
+    #[test]
+    fn refresh_preserves_next_tick_and_spread_never_stacks_or_hits_allies() {
+        let mut world = duel();
+        world
+            .content
+            .abilities
+            .get_mut("firestorm")
+            .unwrap()
+            .crit_chance = 0;
+        let effect = world.content.abilities["firestorm"].effects[1].clone();
+        world.apply_burn(1, 2, "firestorm", &effect);
+        wait(&mut world, 10);
+        world.apply_burn(1, 2, "firestorm", &effect);
+        wait(&mut world, 10);
+        assert_eq!(world.players[&2].view.health, 20000 - 22);
+        world.spread_burn(1, 2, 4000, 1);
+        world.spread_burn(1, 2, 4000, 1);
+        assert_eq!(world.burns.len(), 2);
+        assert!(world.burns.iter().all(|burn| burn.view.target != 3));
+    }
+    #[test]
+    fn detonation_converts_future_damage_without_duplicating_or_feeding_embers() {
+        let mut world = duel();
+        world
+            .content
+            .abilities
+            .get_mut("firestorm")
+            .unwrap()
+            .crit_chance = 0;
+        let effect = world.content.abilities["firestorm"].effects[1].clone();
+        world.apply_burn(1, 2, "firestorm", &effect);
+        world.detonate_burn(1, 2, "worldflare", 50, 3500);
+        assert_eq!(world.players[&2].view.health, 20000 - 88);
+        assert_eq!(world.players[&1].private.embers, 0);
+        wait(&mut world, 160);
+        assert_eq!(world.players[&2].view.health, 20000 - 176);
+    }
 }

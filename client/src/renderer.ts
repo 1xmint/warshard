@@ -573,12 +573,12 @@ export class ArenaRenderer {
       labelHtml: "",
     };
     void this.models
-      .attach(root, player.id, melee)
+      .attach(root, player.id, melee, player.class_id === "arcanist")
       .then((visual) => {
         if (!visual) return;
         actor.visual = visual;
         body.setEnabled(false);
-        label.dataset.model = "kaykit";
+        label.dataset.model = player.class_id === "arcanist" ? "elemental" : "kaykit";
       })
       .catch((error) => {
         label.dataset.model = "fallback";
@@ -673,6 +673,7 @@ export class ArenaRenderer {
           !!p.casting,
           p.health <= 0,
           p.form_until > latest.tick,
+          p.sun,
         );
         actor.root.rotation.y =
           (p.id === localId ? facing : p.facing / 1000) + Math.PI;
@@ -727,7 +728,7 @@ export class ArenaRenderer {
           (f) => f.carrier === p.id,
         );
         const burnEnds = latest.burns
-          .filter((burn) => burn.target === p.id && burn.ability === "firestorm")
+          .filter((burn) => burn.target === p.id)
           .reduce((ends, burn) => Math.max(ends, burn.ends), 0);
         const igniteSeconds = Math.max(0, (burnEnds - latest.tick) / 20);
         const ignite = igniteSeconds > 0

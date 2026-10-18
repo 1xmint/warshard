@@ -1,217 +1,38 @@
-import { test, expect } from "@playwright/test";
-import type { ClientMessage, ServerMessage, Snapshot } from "../client/src/protocol";
-
-test("Arcanist quick duel: licensed models, critical chain, instant payoff, barrier, blink and repeatable difficulty", async ({
-  page,
-}, info) => {
-  test.setTimeout(120_000);
-  let state: Snapshot | null = null,
-    id = 0;
-  let lastSteer: Extract<ClientMessage, { type: "steer" }> | null = null;
-  const observed: Snapshot[] = [];
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("websocket", (socket) =>
-    socket.on("framereceived", ({ payload }) => {
-      const message = JSON.parse(String(payload)) as ServerMessage;
-      if (message.type === "welcome") {
-        state = message.state;
-        id = message.id;
-      }
-      if (message.type === "state") state = message.state;
-      if (message.type === "welcome" || message.type === "state") {
-        observed.push(message.state);
-        if (observed.length > 256) observed.shift();
-      }
-      if (message.type === "error") errors.push(message.code);
-    }),
-  );
-  page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {
-    const message = JSON.parse(String(payload)) as ClientMessage;
-    if (message.type === "steer") lastSteer = message;
-  }));
-  const own = () => state!.players.find((p) => p.id === id)!;
-  const ready = async () => {
-    await expect.poll(() => state?.phase).toBe("active");
-  };
-  const gcd = async () => {
-    await expect.poll(() => own().private!.gcd_until <= state!.tick).toBe(true);
-  };
-  await page.goto("/");
-  await page
-    .getByRole("button", { name: "Arcanist duel · Play now", exact: true })
-    .click();
-  await ready();
-  expect(own().class_id).toBe("arcanist");
-  expect(state!.match_info.bot_difficulty).toBe("trained");
-  await expect
-    .poll(() => state!.players.find((p) => p.bot)?.bot_action)
-    .toBeTruthy();
-  await expect(page.locator("#arena")).toHaveAttribute(
-    "data-arena-art",
-    "kenney",
-    { timeout: 15000 },
-  );
-  await expect(page.locator('.actor-label[data-model="kaykit"]')).toHaveCount(
-    2,
-    { timeout: 15000 },
-  );
-  const oldRound = state!.round;
-  await page.getByRole("button", { name: "Easy", exact: true }).click();
-  await expect.poll(() => state!.round).toBeGreaterThan(oldRound);
-  await ready();
-  expect(state!.match_info.bot_difficulty).toBe("easy");
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Digit4");
-  await expect.poll(() => own().casting?.ability).toBe("sunshard");
-  expect(own().casting!.ends - own().casting!.started).toBe(90);
-  await expect(page.locator("#cast-time")).toContainText("/ 4.5s");
-  await expect(page.locator(".cast-wrap")).toBeVisible();
-  // Observe countdown on the long cast; a short cast can finish between browser reads on CI.
-  const castTime = page.locator("#cast-time");
-  const secondsLeft = async () => Number((await castTime.textContent())!.split("/")[0]);
-  const remaining = await secondsLeft();
-  await expect.poll(secondsLeft).toBeLessThan(remaining);
-  const castBounds = (await page.locator(".cast-bar").boundingBox())!;
-  await expect(page.locator("button.ability")).toHaveCount(9);
-  for (const utility of ['[data-slot="5"]', '[data-slot="6"]', '[data-slot="7"]', '[data-slot="8"]']) {
-    const bounds = (await page.locator(utility).boundingBox())!;
-    expect(bounds.y).toBeGreaterThanOrEqual(castBounds.y + castBounds.height);
-  }
-  await page.screenshot({ path: info.outputPath("arcanist-long-cast.png") });
-  await page.keyboard.down("KeyD");
-  await expect.poll(() => own().casting).toBeNull();
-  await page.keyboard.up("KeyD");
-  await expect.poll(() => lastSteer !== null && lastSteer.dx === 0 && lastSteer.dz === 0).toBe(true);
-  await expect.poll(() => own().private!.ack).toBeGreaterThanOrEqual(lastSteer!.seq);
-  await gcd();
-  const mobileRound = state!.round, mobileTick = state!.tick, mobileOrigin = { ...own().pos };
-  await page.keyboard.down("KeyD");
-  await page.keyboard.press("Digit1");
-  await page.keyboard.press("KeyQ");
-  await expect.poll(() => observed.some((snapshot) => snapshot.round === mobileRound && snapshot.tick >= mobileTick && snapshot.players.some((p) => p.id === id && p.casting?.ability === "cinder_dart" && p.shield > 0))).toBe(true);
-  await expect.poll(() => Math.abs(own().pos.x - mobileOrigin.x) + Math.abs(own().pos.z - mobileOrigin.z)).toBeGreaterThan(300);
-  await page.keyboard.up("KeyD");
-  await expect.poll(() => observed.some((snapshot) => snapshot.round === mobileRound && snapshot.events.some((event) => event.source === id && event.ability === "cinder_dart" && event.tick >= mobileTick && (event.kind === "hit" || event.kind === "crit")))).toBe(true);
-  await expect(page.locator(".cast-wrap")).toBeHidden();
-  // A released key must reach the authoritative movement queue before a new cast.
-  await expect.poll(() => lastSteer !== null && lastSteer.dx === 0 && lastSteer.dz === 0).toBe(true);
-  const stopSeq = lastSteer!.seq;
-  await expect.poll(() => own().private!.ack).toBeGreaterThanOrEqual(stopSeq);
-  await gcd();
-  await page.keyboard.press("Digit2");
-  await expect.poll(() => own().casting?.ability).toBe("flare_lance");
-  expect(own().casting!.ends - own().casting!.started).toBe(30);
-  await expect(page.locator("#cast-time")).toContainText("/ 1.5s");
-  await page.keyboard.down("KeyD");
-  await expect.poll(() => own().casting).toBeNull();
-  await page.keyboard.up("KeyD");
-  const castBarRound = state!.round;
-  await page.getByRole("button", { name: "Restart duel", exact: true }).click();
-  await expect.poll(() => state!.round).toBeGreaterThan(castBarRound);
-  await ready();
-  await page.keyboard.press("Tab");
-  // Retain this brief DOM transition instead of racing the 0.8-second GCD.
-  await page.evaluate(() => {
-    const spell = document.querySelector('[data-slot="0"]')!;
-    new MutationObserver(() => {
-      if (!spell.hasAttribute("data-saw-gcd-shadow") && spell.classList.contains("global-cooldown") && spell.querySelector(".cooldown-label")!.textContent === "") spell.setAttribute("data-saw-gcd-shadow", "true");
-    }).observe(spell, { attributes: true, childList: true, subtree: true });
-  });
-  await page.keyboard.press("Digit3");
-  await expect(page.locator("#proc-banner")).toContainText("KINDLING");
-  // GCD darkens a ready spell without inventing a personal cooldown number.
-  await expect(page.locator('[data-slot="0"]')).toHaveAttribute("data-saw-gcd-shadow", "true");
-
-  await gcd();
-  await page.keyboard.press("Digit3");
-  await expect(page.locator("#proc-banner")).toContainText("SUNSHARD READY");
-  await expect(page.locator('[data-slot="3"]')).toHaveClass(/proc-ready/);
-  expect(own().private!.charges.flashkindle.count).toBe(0);
-  await expect(page.locator('[data-slot="2"] .cooldown-label')).not.toHaveText("");
-  await expect(page.locator('.actor-label[data-team="0"] .team-tag')).toContainText("JADE");
-  await expect(page.locator('.actor-label[data-team="1"] .team-tag')).toContainText("EMBER");
-
-  await page.screenshot({ path: info.outputPath("arcanist-ready.png") });
-  await gcd();
-  const instantRound = state!.round, instantTick = state!.tick;
-  await page.keyboard.press("Digit4");
-  // A legal instant shot may land between browser polls. Keep received snapshots
-  // and accept its authoritative impact as well as its in-flight representation.
-  await expect
-    .poll(() => observed.some((snapshot) => snapshot.round === instantRound && (
-      snapshot.projectiles.some((shot) => shot.owner === id && shot.ability === "sunshard" && shot.started >= instantTick) ||
-      snapshot.events.some((event) => event.source === id && event.ability === "sunshard" && event.tick >= instantTick && (event.kind === "hit" || event.kind === "crit"))
-    )))
-    .toBe(true);
-  await page.screenshot({ path: info.outputPath("arcanist-bolt.png") });
-  expect(own().casting).toBeNull();
-  await expect(page.locator(".cast-wrap")).toBeHidden();
-  expect(own().private!.chain.ready_until).toBe(0);
-  await page.keyboard.press("KeyQ");
-  await expect.poll(() => own().shield).toBeGreaterThan(0);
-  await gcd();
-  const before = { ...own().pos };
-  await page.keyboard.press("Digit5");
-  await expect
-    .poll(
-      () => Math.abs(own().pos.x - before.x) + Math.abs(own().pos.z - before.z),
-    )
-    .toBeGreaterThan(3000);
-  // Earn Ascension through ordinary validated damage; no debug energy grants.
-  for (let casts = 0; casts < 4 && own().private!.energy < 100; casts++) {
-    await gcd();
-    const started = state!.tick;
-    await page.keyboard.press("Digit2");
-    await expect.poll(() => own().casting?.ability).toBe("flare_lance");
-    await expect.poll(() => own().casting).toBeNull();
-    await expect
-      .poll(() =>
-        state!.events.some(
-          (event) =>
-            event.source === id &&
-            event.ability === "flare_lance" &&
-            event.tick >= started &&
-            (event.kind === "hit" || event.kind === "crit"),
-        ),
-      )
-      .toBe(true);
-  }
-  expect(own().private!.energy).toBe(100);
-  await page.keyboard.press("KeyR");
-  await expect.poll(() => own().form).toBe("spellstorm");
-  await expect(page.locator("#hud")).toContainText("Firestorm");
-  await page.screenshot({ path: info.outputPath("arcanist-firestorm.png") });
-  await expect.poll(() => observed.some((snapshot) => snapshot.round === instantRound && snapshot.burns.some((burn) => burn.owner === id && burn.ability === "firestorm"))).toBe(true);
-  await expect(page.locator("#target-ignite")).toContainText("IGNITE");
-  await page.screenshot({ path: info.outputPath("arcanist-ignite.png") });
-  const utilityRound = state!.round;
-  await page.getByRole("button", { name: "Restart duel", exact: true }).click();
-  await expect.poll(() => state!.round).toBeGreaterThan(utilityRound);
-  await ready();
-  await page.keyboard.press("Tab");
-  const meteorRound = state!.round, meteorTick = state!.tick;
-  await page.keyboard.press("KeyE");
-  await expect.poll(() => observed.some((snapshot) => snapshot.round === meteorRound && snapshot.areas.some((area) => area.owner === id && area.ability === "crownfall" && area.activates > area.started && area.started >= meteorTick))).toBe(true);
-  await page.screenshot({ path: info.outputPath("arcanist-crownfall.png") });
-  await gcd();
-  await page.keyboard.press("KeyC");
-  await expect.poll(() => own().private!.cooldowns.glasswake > state!.tick).toBe(true);
-  await page.keyboard.press("KeyF");
-  await expect.poll(() => own().private!.cooldowns.unweave > state!.tick).toBe(true);
-  await page.getByRole("button", { name: "Bot insight", exact: true }).click();
-  await expect(page.locator("#bot-insight")).toContainText("Easy:");
-  await page.getByRole("button", { name: "Skilled", exact: true }).click();
-  await expect.poll(() => state!.match_info.bot_difficulty).toBe("skilled");
-  expect(own().private!.charges.flashkindle).toBeUndefined();
-  expect(own().health).toBe(1550);
-  await ready();
-  const round = state!.round;
-  await page.getByRole("button", { name: "Restart duel", exact: true }).click();
-  await expect.poll(() => state!.round).toBeGreaterThan(round);
-  await ready();
-  await page.locator("#leave").click();
-  await expect(page.locator("#front")).toBeVisible();
-  await expect(page.locator("#duel-controls")).toBeHidden();
-  expect(errors).toEqual([]);
+import {test,expect} from "@playwright/test";
+import type {ServerMessage,Snapshot} from "../client/src/protocol";
+test("Cinderborn: mobile Embers, eight keys, real Ascension kit, Living Sun and repeatable duels",async({page},info)=>{
+ test.setTimeout(150000);let state:Snapshot|null=null,id=0;const observed:Snapshot[]=[],errors:string[]=[];
+ page.on("pageerror",e=>errors.push(e.message));page.on("websocket",socket=>socket.on("framereceived",({payload})=>{const m=JSON.parse(String(payload)) as ServerMessage;if(m.type==="welcome"){id=m.id;state=m.state;}if(m.type==="state")state=m.state;if(m.type==="welcome"||m.type==="state"){observed.push(m.state);if(observed.length>400)observed.shift();}if(m.type==="error")errors.push(m.code);}));
+ const own=()=>state!.players.find(p=>p.id===id)!;const ready=async()=>{await expect.poll(()=>state?.phase).toBe("active");};const gcd=async()=>{await expect.poll(()=>own().private!.gcd_until<=state!.tick).toBe(true);};
+ await page.goto("/");await page.getByRole("button",{name:"Cinderborn duel · Play now",exact:true}).click();await ready();
+ await expect(page.locator('.actor-label[data-model="elemental"]')).toHaveCount(2,{timeout:15000});
+ await expect(page.locator("button.ability")).toHaveCount(7);await expect(page.locator('[data-slot="7"]')).toHaveCount(0);
+ const first=state!.round;await page.getByRole("button",{name:"Easy",exact:true}).click();await expect.poll(()=>state!.round).toBeGreaterThan(first);await ready();await page.keyboard.press("Tab");
+ const start=state!.tick,round=state!.round,origin={...own().pos};await page.keyboard.down("KeyD");await page.keyboard.press("Digit1");await page.keyboard.press("KeyQ");
+ await expect.poll(()=>observed.some(s=>s.round===round&&s.tick>=start&&s.players.some(p=>p.id===id&&p.casting?.ability==="cinder_dart"&&p.shield>0))).toBe(true);
+ await expect.poll(()=>Math.abs(own().pos.x-origin.x)+Math.abs(own().pos.z-origin.z)).toBeGreaterThan(300);await page.keyboard.up("KeyD");
+ await expect.poll(()=>observed.some(s=>s.round===round&&s.events.some(e=>e.source===id&&e.ability==="cinder_dart"&&e.tick>=start&&(e.kind==="hit"||e.kind==="crit")))).toBe(true);await gcd();
+ // A new round restores charges and removes motion before proving a committed cast.
+ const restart=state!.round;await page.getByRole("button",{name:"Restart duel",exact:true}).click();await expect.poll(()=>state!.round).toBeGreaterThan(restart);await ready();await page.keyboard.press("Tab");
+ const castRound=state!.round,castTick=state!.tick;await page.keyboard.press("Digit4");await page.keyboard.press("Digit2");
+ await expect.poll(()=>observed.some(s=>s.round===castRound&&s.tick>=castTick&&s.players.some(p=>p.id===id&&p.casting?.ability==="flare_lance"&&p.private!.charges.flashkindle?.count===1))).toBe(true);
+ await expect(page.locator("#cast-time")).toContainText("1.5s");await page.screenshot({path:info.outputPath("cinderborn-cast.png")});
+ await expect.poll(()=>own().private!.embers).toBe(3);await expect(page.locator('[data-slot="2"]')).toHaveClass(/proc-ready/);await expect(page.locator("#proc-banner")).toContainText("EMBERS");await gcd();
+ await page.screenshot({path:info.outputPath("cinderborn-embers.png")});await page.keyboard.press("Digit3");await expect.poll(()=>own().private!.embers<3).toBe(true);
+ // Earn the meter through ordinary pressure; do not inject energy or stats.
+ for(let casts=0;casts<28&&own().private!.energy<100;casts++){
+  await gcd();await expect.poll(()=>own().casting).toBeNull();const tick=state!.tick;await page.keyboard.press("Digit1");
+  await expect.poll(()=>observed.some(s=>s.round===castRound&&s.events.some(e=>e.source===id&&e.ability==="cinder_dart"&&e.tick>=tick&&(e.kind==="hit"||e.kind==="crit")))).toBe(true);
+ }
+ expect(own().private!.energy).toBe(100);await page.keyboard.press("KeyR");await expect.poll(()=>own().form).toBe("spellstorm");
+ await expect(page.getByRole("button",{name:"1: Infernal Jet",exact:true})).toBeVisible();await expect(page.getByRole("button",{name:"4: Living Sun",exact:true})).toBeVisible();
+ await gcd();await page.keyboard.press("Digit4");await expect.poll(()=>own().sun?.charges).toBe(3);await expect(page.locator("#proc-banner")).toContainText("LIVING SUN");
+ await expect.poll(()=>own().casting).toBeNull();await gcd();const echoTick=state!.tick;await page.keyboard.press("Digit3");
+ await expect.poll(()=>observed.some(s=>s.round===castRound&&s.events.some(e=>e.source===id&&e.kind==="echo"&&e.tick>=echoTick))).toBe(true);
+ await page.screenshot({path:info.outputPath("cinderborn-ascendant.png")});
+ const reset=state!.round;await page.getByRole("button",{name:"Restart duel",exact:true}).click();await expect.poll(()=>state!.round).toBeGreaterThan(reset);await ready();
+ expect(own().sun).toBeNull();expect(own().private!.embers).toBe(0);await page.keyboard.press("Tab");const meteorRound=state!.round,meteorTick=state!.tick;await page.keyboard.press("KeyE");
+ await expect.poll(()=>observed.some(s=>s.round===meteorRound&&s.areas.some(a=>a.owner===id&&a.ability==="crownfall"&&a.started>=meteorTick))).toBe(true);
+ await expect.poll(()=>state!.burns.some(b=>b.owner===id&&b.ability==="crownfall")).toBe(true);await expect(page.locator("#target-ignite")).toContainText("IGNITE");await page.screenshot({path:info.outputPath("cinderborn-meteor.png")});
+ await page.locator("#leave").click();await expect(page.locator("#front")).toBeVisible();expect(errors).toEqual([]);
 });

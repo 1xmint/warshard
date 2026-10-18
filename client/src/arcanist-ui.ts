@@ -12,7 +12,7 @@ export class ArcanistUI {
   }) {
     const quick = document.createElement("button");
     quick.id = "arcanist-duel";
-    quick.textContent = "Arcanist duel · Play now";
+    quick.textContent = "Cinderborn duel · Play now";
     quick.onclick = actions.quick;
     document.querySelector(".front-actions")!.prepend(quick);
     this.proc.id = "proc-banner";
@@ -75,20 +75,13 @@ export class ArcanistUI {
         "aria-pressed",
         String(button.dataset.difficulty === this.difficulty),
       );
-    const ready = own.private.chain.ready_until > state.tick;
-    const prepared = own.private.chain.prepared_until > state.tick;
+    const ready = own.private.embers >= 3;
     this.proc.classList.toggle("hidden", !arcanist || state.phase !== "active");
     this.proc.classList.toggle("ready", ready);
-    this.proc.classList.toggle("prepared", prepared && !ready);
-    const text = ready
-      ? `SUNSHARD READY · Press 4 · ${Math.ceil((own.private.chain.ready_until - state.tick) / 20)}s`
-      : prepared
-        ? `KINDLING · Your next critical completes the chain · ${Math.ceil((own.private.chain.prepared_until - state.tick) / 20)}s`
-        : "Cinder Dart starts Kindling · critical hits complete it · Firestorm burn criticals can join once per second";
-    if (this.proc.textContent !== text) this.proc.textContent = text;
-    const sun = document.querySelector('[data-slot="3"]');
-    sun?.classList.toggle("proc-ready", arcanist && ready);
-    const insight = state.players
+    this.proc.classList.toggle("prepared", own.private.embers > 0 && !ready);
+    const name = content.abilities[content.forms[own.form].abilities[2]].name;
+    this.proc.textContent = `${"●".repeat(own.private.embers)}${"○".repeat(3-own.private.embers)} EMBERS · ${ready ? `${name.toUpperCase()} READY · Press 3` : "Build with 1/2 · commit to 4 when safe"}${own.sun ? ` · LIVING SUN: ${own.sun.charges} echoes` : ""}`;
+    document.querySelector('[data-slot="2"]')?.classList.toggle("proc-ready", arcanist && ready);    const insight = state.players
       .filter((p) => p.bot)
       .map(
         (p) =>

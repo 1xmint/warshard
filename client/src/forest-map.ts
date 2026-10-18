@@ -6,6 +6,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Arena } from "./protocol";
@@ -47,7 +48,7 @@ export class ForestMap {
     const terrainTexture = new DynamicTexture("riftwood-original-painted-ground", { width: 1040, height: 560 }, this.scene, false);
     terrainTexture.hasAlpha = false;
     terrainTexture.wrapU = terrainTexture.wrapV = Texture.CLAMP_ADDRESSMODE;
-    this.paintTerrain(terrainTexture.getContext(), hx, hz);
+    this.paintTerrain(terrainTexture.getContext() as CanvasRenderingContext2D, hx, hz);
     terrainTexture.update(false);
     const terrain = MeshBuilder.CreateGround("forest-floor", { width: hx * 2, height: hz * 2, subdivisions: 1 }, this.scene);
     terrain.position.y = -0.035; terrain.parent = root; terrain.isPickable = false;
@@ -155,7 +156,9 @@ export class ForestMap {
     };
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2, c = colors[i % colors.length];
-      const x = Math.cos(a) * (hx + 5 + (i % 3) * 1.5), z = Math.sin(a) * (hz + 4 + (i % 2) * 1.5);
+      const eastWest = Math.abs(Math.cos(a)) > Math.abs(Math.sin(a));
+      const x = eastWest ? Math.sign(Math.cos(a)) * (hx + 8) : Math.cos(a) * (hx + 5);
+      const z = eastWest ? Math.sin(a) * (hz + 5) : Math.sign(Math.sin(a)) * (hz + 8);
       mound(x, z, 4 + (i % 4), 1.1 + (i % 3) * 0.25, 3.5 + (i % 3), c, "forest-soft-rolling-hill");
     }
     // Rounded distant ridges sit within the camera's far view and stay beyond the playable edge.
@@ -197,7 +200,7 @@ export class ForestMap {
       place("tent_detailedOpen", sign * (hx + 2.7), -6, 5, 5, 5, -sign * Math.PI / 2);
       place("campfire_stones", sign * (hx + 1.6), 5, 3);
     }
-    this.addGrass(parent, arena, mat);
+    this.addGrass(parent, arena);
     for (let i = 0; i < 18; i++) {
       const x = -hx + 2 + (i * 7.37) % (hx * 2 - 4), z = -hz + 2 + (i * 4.61) % (hz * 2 - 4);
       if (Math.abs(z) < 4 || Math.abs(Math.abs(z) - 10.5) < 3 || Math.abs(x) > 17) continue;
@@ -206,7 +209,7 @@ export class ForestMap {
     for (const mesh of parent.getChildMeshes()) if (mesh.metadata?.coverFallback) mesh.setEnabled(false);
     document.querySelector<HTMLCanvasElement>("#arena")!.dataset.arenaArt = "kenney-forest";
   }
-  private addGrass(parent: TransformNode, arena: Arena, mat: (color: string) => StandardMaterial) {
+  private addGrass(parent: TransformNode, arena: Arena) {
     let seed = 0x71eaf;
     const random = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 0x100000000; };
     const hx = arena.half_x / 1000, hz = arena.half_z / 1000;
@@ -229,7 +232,7 @@ export class ForestMap {
     const mesh = new Mesh("bounded-batched-painted-grass", this.scene); mesh.parent = parent; mesh.isPickable = false;
     const data = new VertexData(); data.positions = positions; data.indices = indices; data.colors = colors;
     data.normals = []; VertexData.ComputeNormals(positions, indices, data.normals); data.applyToMesh(mesh, false);
-    const material = mat("#ffffff"); material.useVertexColors = true; material.backFaceCulling = false; material.specularColor = Color3.Black();
+    const material = new StandardMaterial("forest-grass", this.scene); material.backFaceCulling = false; material.specularColor = Color3.Black();
     mesh.material = material;
   }
 }

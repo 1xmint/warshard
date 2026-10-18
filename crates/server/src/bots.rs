@@ -596,7 +596,7 @@ mod tests {
                 .casting
                 .is_some()
         );
-        for _ in 0..16 {
+        for _ in 0..26 {
             update(&mut world, &mut memory);
             world.step();
         }

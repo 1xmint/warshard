@@ -3,6 +3,19 @@
   color: #ffdd9b;
   background: linear-gradient(120deg, #503b2b, #1c3339);
 }
+.ascension-gauge { position:absolute;bottom:0;left:0;right:0;height:5px;background:#1b1511;overflow:hidden; }
+.ascension-gauge i { display:block;height:100%;background:linear-gradient(90deg,#d95323,#ffdc7e);transform-origin:left; }
+.unit-frame { top:auto;bottom:280px;width:265px;gap:0; }
+.unit-frame.self { left:calc(50% - 275px); }
+.unit-frame.target { right:calc(50% - 275px); }
+.unit-frame .portrait { display:none; }
+.unit-frame .bar { height:22px; }
+.unit-frame .bar span { font-size:13px;text-shadow:0 1px 3px #000; }
+@media(max-width:760px) {
+  .unit-frame { width:210px;bottom:270px; }
+  .unit-frame.self { left:calc(50% - 215px); }
+  .unit-frame.target { right:calc(50% - 215px); }
+}
 .arcanist-card strong {
   color: #f4b96b;
   font-size: 50px;
