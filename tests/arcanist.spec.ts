@@ -24,6 +24,8 @@ test("Cinderborn: mobile Embers, eight keys, real Ascension kit, Living Sun and 
  // Earn the meter through ordinary pressure; do not inject energy or stats.
  for(let casts=0;casts<28&&own().private!.energy<100;casts++){
   await gcd();await expect.poll(()=>own().casting).toBeNull();const tick=state!.tick;await page.keyboard.press("Digit1");
+  await expect.poll(()=>observed.some(s=>s.round===castRound&&s.tick>tick&&s.players.some(p=>p.id===id&&p.casting?.ability==="cinder_dart"&&p.casting.started>=tick))).toBe(true);
+  await expect.poll(()=>own().casting).toBeNull();
   await expect.poll(()=>observed.some(s=>s.round===castRound&&s.events.some(e=>e.source===id&&e.ability==="cinder_dart"&&e.tick>tick&&(e.kind==="hit"||e.kind==="crit")))).toBe(true);
  }
  expect(own().private!.energy).toBe(100);await page.keyboard.press("KeyR");await expect.poll(()=>own().form).toBe("spellstorm");
