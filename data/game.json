@@ -592,7 +592,7 @@
     },
     "sunshard": {
       "name": "Sunshard",
-      "description": "A powerful 3-second spell. Conflagration makes the next Sunshard instant for 10 seconds. Its critical hit can start the next chain.",
+      "description": "A powerful 3-second spell. Two critical hits bank an instant Sunshard for 10 seconds. Its critical hit can start the next Kindling chain.",
       "icon": "sun",
       "target": "enemy",
       "range": 12500,

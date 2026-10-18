@@ -81,6 +81,30 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
       () => Math.abs(own().pos.x - before.x) + Math.abs(own().pos.z - before.z),
     )
     .toBeGreaterThan(3000);
+  // Earn Ascension through ordinary validated damage; no debug energy grants.
+  for (let casts = 0; casts < 4 && own().private!.energy < 100; casts++) {
+    await gcd();
+    const started = state!.tick;
+    await page.keyboard.press("Digit2");
+    await expect.poll(() => own().casting?.ability).toBe("flare_lance");
+    await expect.poll(() => own().casting).toBeNull();
+    await expect
+      .poll(() =>
+        state!.events.some(
+          (event) =>
+            event.source === id &&
+            event.ability === "flare_lance" &&
+            event.tick >= started &&
+            (event.kind === "hit" || event.kind === "crit"),
+        ),
+      )
+      .toBe(true);
+  }
+  expect(own().private!.energy).toBe(100);
+  await page.keyboard.press("KeyR");
+  await expect.poll(() => own().form).toBe("spellstorm");
+  await expect(page.locator("#hud")).toContainText("Spellstorm");
+  await page.screenshot({ path: info.outputPath("arcanist-spellstorm.png") });
   await page.getByRole("button", { name: "Bot insight", exact: true }).click();
   await expect(page.locator("#bot-insight")).toContainText("Easy:");
   await page.getByRole("button", { name: "Skilled", exact: true }).click();
