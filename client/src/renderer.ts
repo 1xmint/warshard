@@ -385,6 +385,12 @@ export class ArenaRenderer {
     if (this.mapId !== mapId || JSON.stringify(this.arena) !== JSON.stringify(content.arena)) {
       this.mapId = mapId;
       this.arena = content.arena;
+      const forest = mapId === "riftwood_crossing";
+      this.scene.clearColor = forest ? new Color4(0.25, 0.42, 0.48, 1) : new Color4(0.035, 0.065, 0.083, 1);
+      this.scene.fogColor = forest ? new Color3(0.25, 0.42, 0.48) : new Color3(0.045, 0.082, 0.101);
+      this.scene.fogDensity = forest ? 0.009 : 0.012;
+      this.camera.beta = forest ? 1.02 : 0.85;
+      this.camera.radius = forest ? 31 : 39;
       this.buildCourt(this.arena);
     }
     for (const flag of this.flagMeshes.values()) flag.dispose(false);

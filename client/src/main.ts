@@ -437,6 +437,7 @@ function updateHud() {
   $("#self-hp").textContent =
     `${p.health} / ${p.max_health}${p.shield ? ` + ${p.shield}` : ""}`;
   $("#resource").style.width = `${info.ember_kit ? p.private.embers / 3 * 100 : p.private.resource}%`;
+  $("#resource").classList.toggle("ember-resource", info.ember_kit);
   $("#self-status").textContent =
     p.health <= 0
       ? "Fallen"
