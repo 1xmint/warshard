@@ -549,9 +549,10 @@ mod tests {
         assert_eq!(world.players[&1].cast.as_ref().unwrap().view.ends, ends);
         world.cast(1, 4, None, None).unwrap();
         assert!(world.players[&1].cast.is_none());
-        world.cast(1, 4, None, None).unwrap();
+        world.mobility(1, Some(2)).unwrap();
         assert_eq!(world.charge_count(1, "riftstep"), 0);
         assert_eq!(world.cast(1, 4, None, None), Err("cooldown"));
+        assert_eq!(world.mobility(1, Some(2)), Err("cooldown"));
         wait(&mut world, 240);
         assert_eq!(world.charge_count(1, "riftstep"), 1);
         wait(&mut world, 240);

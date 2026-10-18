@@ -82,6 +82,20 @@ impl World {
     pub fn mobility(&mut self, id: u32, target: Option<u32>) -> Result<(), &'static str> {
         self.actionable(id)?;
         let p = &self.players[&id];
+        // A kit blink replaces legacy mobility, rather than granting a second
+        // movement resource to clients that send the older intent directly.
+        if let Some(slot) = self.content.forms[&p.view.form]
+            .abilities
+            .iter()
+            .position(|ability| {
+                self.content.abilities[ability]
+                    .effects
+                    .iter()
+                    .any(|effect| matches!(effect, Effect::Blink { .. }))
+            })
+        {
+            return self.cast(id, slot as u8, None, None);
+        }
         if p.view.root_until > self.tick {
             return Err("rooted");
         }
