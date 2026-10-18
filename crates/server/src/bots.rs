@@ -423,6 +423,25 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
             );
             world.players.get_mut(&id).unwrap().view.bot_action = Some(action.into());
             // Failed casts do not reveal a hidden opponent state; try another legal action next decision.
+        } else if state.match_info.kind == "ctf" {
+            let home = &state.match_info.flags[usize::from(own.team)];
+            let carrying = state
+                .match_info
+                .flags
+                .iter()
+                .any(|flag| flag.carrier == Some(id));
+            let goal = if carrying {
+                home.home
+            } else if home.dropped_until > 0 {
+                home.pos
+            } else {
+                state.match_info.flags[usize::from(1 - own.team)].pos
+            };
+            let (dx, dz) = direction(&world.content.arena, own.pos, goal);
+            let scale = if dx != 0 && dz != 0 { 707 } else { 1000 };
+            memory.movement = (i16::from(dx) * scale, i16::from(dz) * scale, own.facing);
+            world.players.get_mut(&id).unwrap().view.bot_action =
+                Some("Run the flag while opponents respawn".into());
         }
     }
     memory.seq += 1;
