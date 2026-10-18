@@ -180,8 +180,11 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   expect(own().private!.energy).toBe(100);
   await page.keyboard.press("KeyR");
   await expect.poll(() => own().form).toBe("spellstorm");
-  await expect(page.locator("#hud")).toContainText("Spellstorm");
-  await page.screenshot({ path: info.outputPath("arcanist-spellstorm.png") });
+  await expect(page.locator("#hud")).toContainText("Firestorm");
+  await page.screenshot({ path: info.outputPath("arcanist-firestorm.png") });
+  await expect.poll(() => observed.some((snapshot) => snapshot.round === instantRound && snapshot.burns.some((burn) => burn.owner === id && burn.ability === "firestorm"))).toBe(true);
+  await expect(page.locator("#target-ignite")).toContainText("IGNITE");
+  await page.screenshot({ path: info.outputPath("arcanist-ignite.png") });
   const utilityRound = state!.round;
   await page.getByRole("button", { name: "Restart duel", exact: true }).click();
   await expect.poll(() => state!.round).toBeGreaterThan(utilityRound);

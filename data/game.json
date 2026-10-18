@@ -35,7 +35,7 @@
     },
     "arcanist": {
       "name": "Arcanist",
-      "description": "Turn sparks into a star. Chain critical hits, bank an instant Sunshard, and kite through a Spellstorm.",
+      "description": "Turn sparks into a star. Chain critical hits, bank an instant Sunshard, and turn Firestorm burns into fresh Kindling.",
       "base_form": "arcanist",
       "ultimate_forms": [
         "spellstorm"
