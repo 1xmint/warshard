@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "classes": {
     "briarwarden": {
       "name": "Briarwarden",
@@ -35,7 +35,7 @@
     },
     "arcanist": {
       "name": "Arcanist",
-      "description": "Turn sparks into a star. Chain critical hits, bank an instant Sunshard, and kite through a Spellstorm.",
+      "description": "Turn sparks into a star. Chain critical hits, bank an instant Sunshard, and turn Firestorm burns into fresh Kindling.",
       "base_form": "arcanist",
       "ultimate_forms": [
         "spellstorm"
@@ -49,8 +49,10 @@
         "retreat": true
       },
       "utilities": [
+        "prism_ward",
+        "crownfall",
         "unweave",
-        "prism_ward"
+        "glasswake"
       ]
     }
   },
@@ -111,7 +113,8 @@
       ]
     },
     "spellstorm": {
-      "name": "Spellstorm",
+      "name": "Firestorm",
+      "activation": "firestorm",
       "duration": 240,
       "abilities": [
         "cinder_dart",
@@ -126,7 +129,7 @@
     "thorncut": {
       "name": "Thorncut",
       "description": "A quick close-range strike.",
-      "icon": "\u2160",
+      "icon": "Ⅰ",
       "target": "enemy",
       "range": 2200,
       "cast": 0,
@@ -144,7 +147,7 @@
     "cleave": {
       "name": "Ironbloom",
       "description": "A heavy committed strike.",
-      "icon": "\u2161",
+      "icon": "Ⅱ",
       "target": "enemy",
       "range": 2400,
       "cast": 14,
@@ -162,7 +165,7 @@
     "bark": {
       "name": "Barkguard",
       "description": "Absorb damage for 6 seconds.",
-      "icon": "\u2162",
+      "icon": "Ⅲ",
       "target": "own",
       "range": 0,
       "cast": 0,
@@ -181,7 +184,7 @@
     "hush": {
       "name": "Hushblade",
       "description": "Interrupt a cast; lock its school for 3 seconds.",
-      "icon": "\u2163",
+      "icon": "Ⅳ",
       "target": "enemy",
       "range": 2500,
       "cast": 0,
@@ -199,7 +202,7 @@
     "snare": {
       "name": "Briarbind",
       "description": "Root a nearby enemy for 2 seconds.",
-      "icon": "\u2164",
+      "icon": "Ⅴ",
       "target": "enemy",
       "range": 4500,
       "cast": 0,
@@ -221,7 +224,7 @@
     "bolt": {
       "name": "Emberthread",
       "description": "A ranged cast of searing thread.",
-      "icon": "\u2160",
+      "icon": "Ⅰ",
       "target": "enemy",
       "range": 13000,
       "cast": 28,
@@ -239,7 +242,7 @@
     "spark": {
       "name": "Cinderlash",
       "description": "Instant flame that slows for 2 seconds.",
-      "icon": "\u2161",
+      "icon": "Ⅱ",
       "target": "enemy",
       "range": 10000,
       "cast": 0,
@@ -261,7 +264,7 @@
     "veil": {
       "name": "Ashveil",
       "description": "Wrap yourself in an absorbing ward.",
-      "icon": "\u2162",
+      "icon": "Ⅲ",
       "target": "own",
       "range": 0,
       "cast": 0,
@@ -280,7 +283,7 @@
     "sever": {
       "name": "Threadsever",
       "description": "Interrupt a cast; lock its school for 3 seconds.",
-      "icon": "\u2163",
+      "icon": "Ⅳ",
       "target": "enemy",
       "range": 11000,
       "cast": 0,
@@ -298,7 +301,7 @@
     "rain": {
       "name": "Cinderfall",
       "description": "Place a 4-second field after a 1.5-second cast. No enemy warning until impact.",
-      "icon": "\u2164",
+      "icon": "Ⅴ",
       "target": "ground",
       "range": 12500,
       "cast": 30,
@@ -319,7 +322,7 @@
     "crown_cut": {
       "name": "Crownstrike",
       "description": "Empowered close-range strike.",
-      "icon": "\u2160",
+      "icon": "Ⅰ",
       "target": "enemy",
       "range": 3000,
       "cast": 0,
@@ -337,7 +340,7 @@
     "crown_crush": {
       "name": "Canopy Break",
       "description": "A crushing blow and brief root.",
-      "icon": "\u2161",
+      "icon": "Ⅱ",
       "target": "enemy",
       "range": 3200,
       "cast": 10,
@@ -359,7 +362,7 @@
     "crown_guard": {
       "name": "Heartwood",
       "description": "Restore health and gain a ward.",
-      "icon": "\u2162",
+      "icon": "Ⅲ",
       "target": "own",
       "range": 0,
       "cast": 0,
@@ -382,7 +385,7 @@
     "crown_hush": {
       "name": "Sovereign Hush",
       "description": "Longer reach and a 4-second school lock.",
-      "icon": "\u2163",
+      "icon": "Ⅳ",
       "target": "enemy",
       "range": 5500,
       "cast": 0,
@@ -400,7 +403,7 @@
     "crown_bind": {
       "name": "Wild Edict",
       "description": "Reach out with roots and thorns.",
-      "icon": "\u2164",
+      "icon": "Ⅴ",
       "target": "enemy",
       "range": 7000,
       "cast": 0,
@@ -422,7 +425,7 @@
     "nova_bolt": {
       "name": "Starthread",
       "description": "A faster empowered ranged cast.",
-      "icon": "\u2160",
+      "icon": "Ⅰ",
       "target": "enemy",
       "range": 14000,
       "cast": 16,
@@ -440,7 +443,7 @@
     "nova_spark": {
       "name": "Flarelash",
       "description": "Instant empowered flame.",
-      "icon": "\u2161",
+      "icon": "Ⅱ",
       "target": "enemy",
       "range": 12000,
       "cast": 0,
@@ -462,7 +465,7 @@
     "nova_veil": {
       "name": "Solar Shroud",
       "description": "Heal and absorb incoming damage.",
-      "icon": "\u2162",
+      "icon": "Ⅲ",
       "target": "own",
       "range": 0,
       "cast": 0,
@@ -485,7 +488,7 @@
     "nova_sever": {
       "name": "Eclipse Thread",
       "description": "Interrupt with a longer school lock.",
-      "icon": "\u2163",
+      "icon": "Ⅳ",
       "target": "enemy",
       "range": 13000,
       "cast": 0,
@@ -503,7 +506,7 @@
     "nova_rain": {
       "name": "Falling Sun",
       "description": "An empowered area, visible only after its cast.",
-      "icon": "\u2164",
+      "icon": "Ⅴ",
       "target": "ground",
       "range": 14000,
       "cast": 20,
@@ -523,11 +526,11 @@
     },
     "cinder_dart": {
       "name": "Cinder Dart",
-      "description": "Mobile pressure. Critical hits prepare Kindling; a second critical hit readies an instant Sunshard.",
+      "description": "Cast while moving. A low-damage spark that starts Kindling even without a critical hit; a critical hit can complete the chain.",
       "icon": "dart",
       "target": "enemy",
       "range": 12500,
-      "cast": 0,
+      "cast": 20,
       "cooldown": 1,
       "cost": 8,
       "gcd": 16,
@@ -535,14 +538,16 @@
       "effects": [
         {
           "kind": "damage",
-          "amount": 60
+          "amount": 50
         }
       ],
       "crit_chance": 30,
       "chains": true,
       "consumes_chain": false,
       "projectile_step": 1200,
-      "charges": 0
+      "charges": 0,
+      "cast_while_moving": true,
+      "primes_chain": true
     },
     "flare_lance": {
       "name": "Flare Lance",
@@ -615,56 +620,129 @@
     },
     "riftstep": {
       "name": "Riftstep",
-      "description": "Blink up to 5m in the direction you face. Stops at terrain; roots prevent it.",
+      "description": "Two charges. Blink up to 5m in the direction you face. Stops at terrain; roots prevent it. Charges recover one at a time every 12 seconds.",
       "icon": "blink",
       "target": "own",
       "range": 0,
       "cast": 0,
       "cooldown": 240,
       "cost": 10,
-      "gcd": 10,
+      "gcd": 0,
       "school": "arcane",
       "effects": [
         {
           "kind": "blink",
           "distance": 5000
         }
-      ]
+      ],
+      "off_gcd": true,
+      "charges": 2
     },
     "unweave": {
-      "name": "Unweave",
-      "description": "Interrupt the target and lock its spell school for 3 seconds.",
+      "name": "Sunderflare",
+      "description": "A searing arcane lash deals 70 damage and slows for 1.5 seconds. If it catches a cast, interrupt it and lock that spell school for 3 seconds. Cancels your own cast; off the global cooldown.",
       "icon": "interrupt",
       "target": "enemy",
       "range": 12500,
       "cast": 0,
       "cooldown": 200,
       "cost": 10,
-      "gcd": 1,
+      "gcd": 0,
       "school": "arcane",
       "effects": [
         {
           "kind": "interrupt",
           "duration": 60
+        },
+        {
+          "kind": "damage",
+          "amount": 70
+        },
+        {
+          "kind": "slow",
+          "duration": 30
         }
-      ]
+      ],
+      "off_gcd": true
     },
     "prism_ward": {
       "name": "Prism Ward",
-      "description": "Absorb 240 damage for 6 seconds. Time it against incoming pressure.",
+      "description": "Q: Absorb 240 damage for 6 seconds. Usable off the global cooldown without interrupting your cast.",
       "icon": "barrier",
       "target": "own",
       "range": 0,
       "cast": 0,
       "cooldown": 400,
       "cost": 10,
-      "gcd": 1,
+      "gcd": 0,
       "school": "arcane",
       "effects": [
         {
           "kind": "shield",
           "amount": 240,
           "duration": 120
+        }
+      ],
+      "off_gcd": true
+    },
+    "crownfall": {
+      "name": "Crownfall",
+      "description": "E: Cast for 0.75s, then drop a meteor after 1.2s onto the enemy's position. Deals 240 base damage to enemies within 2.7m at impact; critical hits build Kindling. Root them with Glasswake to set up the hit.",
+      "crit_chance": 30,
+      "chains": true,
+      "icon": "sun",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 15,
+      "cooldown": 400,
+      "cost": 20,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "delayed_area",
+          "amount": 240,
+          "radius": 2700,
+          "delay": 24
+        }
+      ]
+    },
+    "firestorm": {
+      "name": "Firestorm",
+      "description": "Transform for 12 seconds and launch a huge fireball. It explodes for 180 base damage within 4m and ignites enemies for 22 base damage each second for 8 seconds. Burn criticals build Kindling, at most once per second across all targets. Requires an enemy target and 100 energy.",
+      "icon": "sun",
+      "target": "enemy",
+      "range": 14000,
+      "cast": 0,
+      "cooldown": 1,
+      "cost": 0,
+      "gcd": 0,
+      "school": "ember",
+      "crit_chance": 40,
+      "chains": true,
+      "off_gcd": true,
+      "projectile_step": 600,
+      "effects": [
+        { "kind": "splash", "amount": 180, "radius": 4000 },
+        { "kind": "burn_area", "amount": 22, "radius": 4000, "duration": 160, "interval": 20, "proc_interval": 20 }
+      ]
+    },
+    "glasswake": {
+      "name": "Glasswake",
+      "description": "C: Root nearby enemies within 2.7m for 3 seconds. Peel melee or set up Crownfall. Repeated roots have diminishing duration.",
+      "icon": "spark",
+      "target": "own",
+      "range": 0,
+      "cast": 0,
+      "cooldown": 360,
+      "cost": 12,
+      "gcd": 16,
+      "school": "glass",
+      "effects": [
+        {
+          "kind": "root_area",
+          "radius": 2700,
+          "duration": 60
         }
       ]
     }

@@ -5,11 +5,9 @@ export class ArcanistUI {
   private debug = false;
   private proc = document.createElement("div");
   private panel = document.createElement("aside");
-  private barrier = document.createElement("button");
   constructor(actions: {
     quick: () => void;
     reset: (difficulty: BotDifficulty) => void;
-    barrier: () => void;
     sound: () => boolean;
   }) {
     const quick = document.createElement("button");
@@ -29,12 +27,7 @@ export class ArcanistUI {
     retry.textContent = "Fight again";
     retry.onclick = () => actions.reset(this.difficulty);
     document.querySelector("#results-menu")!.before(retry);
-    this.barrier.id = "arcanist-barrier";
-    this.barrier.className = "arcanist-barrier hidden";
-    this.barrier.textContent = "E · Prism Ward";
-    this.barrier.onclick = actions.barrier;
     document.querySelector("#hud")!.prepend(this.proc);
-    document.querySelector("#utility-actions")!.append(this.barrier);
     document.body.append(this.panel);
     for (const button of this.panel.querySelectorAll<HTMLButtonElement>(
       "[data-difficulty]",
@@ -63,7 +56,6 @@ export class ArcanistUI {
   hide() {
     this.panel.classList.add("hidden");
     this.proc.classList.add("hidden");
-    this.barrier.classList.add("hidden");
   }
   update(state: Snapshot, id: number, content: Content) {
     const own = state.players.find((p) => p.id === id);
@@ -75,10 +67,6 @@ export class ArcanistUI {
     document
       .querySelector("#retry-duel")!
       .classList.toggle("hidden", !practice);
-    this.barrier.classList.toggle(
-      "hidden",
-      !arcanist || state.phase !== "active",
-    );
     this.difficulty = state.match_info.bot_difficulty;
     for (const button of this.panel.querySelectorAll<HTMLButtonElement>(
       "[data-difficulty]",
@@ -87,12 +75,6 @@ export class ArcanistUI {
         "aria-pressed",
         String(button.dataset.difficulty === this.difficulty),
       );
-    const cooldown = Math.max(
-      0,
-      (own.private.cooldowns.prism_ward ?? 0) - state.tick,
-    );
-    this.barrier.textContent = `E · Prism Ward${cooldown ? ` · ${Math.ceil(cooldown / 20)}s` : ""}`;
-    this.barrier.title = content.abilities.prism_ward.description;
     const ready = own.private.chain.ready_until > state.tick;
     const prepared = own.private.chain.prepared_until > state.tick;
     this.proc.classList.toggle("hidden", !arcanist || state.phase !== "active");
@@ -101,8 +83,8 @@ export class ArcanistUI {
     const text = ready
       ? `SUNSHARD READY · Press 4 · ${Math.ceil((own.private.chain.ready_until - state.tick) / 20)}s`
       : prepared
-        ? `KINDLING · A critical hit readies Sunshard · ${Math.ceil((own.private.chain.prepared_until - state.tick) / 20)}s`
-        : "Build Kindling with critical hits · Flashkindle can force the next critical hit";
+        ? `KINDLING · Your next critical completes the chain · ${Math.ceil((own.private.chain.prepared_until - state.tick) / 20)}s`
+        : "Cinder Dart starts Kindling · critical hits complete it · Firestorm burn criticals can join once per second";
     if (this.proc.textContent !== text) this.proc.textContent = text;
     const sun = document.querySelector('[data-slot="3"]');
     sun?.classList.toggle("proc-ready", arcanist && ready);

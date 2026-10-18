@@ -1,5 +1,7 @@
 //! Practice opponents issue the same legal intents as humans. No damage shortcuts.
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
+mod navigation;
+use navigation::direction;
 use warshard_sim::{geometry::Pos, *};
 
 #[derive(Default)]
@@ -78,8 +80,12 @@ pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, BotMemory>) {
             e.pos
         } else {
             // Flag runners use an outside lane to avoid the central melee.
-            let lane = if id.is_multiple_of(2) { 10500 } else { -10500 };
-            if objective_role && (objective.x - p.pos.x).abs() > 18000 && p.pos.z.abs() < 9000 {
+            let lane = if (id / 2).is_multiple_of(2) {
+                12000
+            } else {
+                -12000
+            };
+            if objective_role && (objective.x - p.pos.x).abs() > 18000 && p.pos.z.abs() < 11000 {
                 Pos {
                     x: p.pos.x,
                     z: lane,
@@ -133,7 +139,12 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
             .players
             .iter()
             .filter(|p| p.team != own.team && p.health > 0 && p.connected)
-            .min_by_key(|p| own.pos.distance_sq(p.pos));
+            .min_by_key(|p| {
+                (
+                    !world.content.arena.line_of_sight(own.pos, p.pos),
+                    own.pos.distance_sq(p.pos),
+                )
+            });
         memory.movement = (0, 0, own.facing);
         if let Some(enemy) = enemy {
             let distance = own.pos.distance_sq(enemy.pos);
@@ -158,9 +169,48 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                     && own.pos.distance_sq(a.pos) < i64::from(a.radius + 600).pow(2)
             });
             let pressured = own.health * 100 / own.max_health < 40;
+            let carrying = state
+                .match_info
+                .flags
+                .iter()
+                .any(|flag| flag.carrier == Some(id));
+            let objective_role = carrying || id.is_multiple_of(3);
+            let objective = (state.match_info.kind == "ctf").then(|| {
+                let home = &state.match_info.flags[usize::from(own.team)];
+                if carrying {
+                    home.home
+                } else if home.dropped_until > 0 {
+                    home.pos
+                } else {
+                    state.match_info.flags[usize::from(1 - own.team)].pos
+                }
+            });
+            let travelling =
+                objective.is_some() && (carrying || distance > 14000_i64.pow(2) || objective_role);
             let mut goal = if let Some(area) = danger {
                 away(area.pos)
-            } else if ranged && distance < 6000_i64.pow(2) {
+            } else if travelling {
+                let destination = objective.unwrap();
+                // Both teams use both lanes rather than tying lane selection to team parity.
+                let lane = if (id / 2).is_multiple_of(2) {
+                    12000
+                } else {
+                    -12000
+                };
+                if (destination.x - own.pos.x).abs() > 16000 && own.pos.z.abs() < 11000 {
+                    Pos {
+                        x: own.pos.x,
+                        z: lane,
+                    }
+                } else if (destination.x - own.pos.x).abs() > 8000 {
+                    Pos {
+                        x: destination.x,
+                        z: lane,
+                    }
+                } else {
+                    destination
+                }
+            } else if ranged && distance < 5000_i64.pow(2) {
                 away(enemy.pos)
             } else if (!ranged && distance > 1800_i64.pow(2))
                 || (ranged && distance > 10000_i64.pow(2))
@@ -193,18 +243,70 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                 && distance <= 12500_i64.pow(2)
                 && world.content.arena.line_of_sight(own.pos, enemy.pos)
             {
-                let _ = world.ultimate(id, None);
+                let _ = world.ultimate(id, None, Some(enemy.id));
+            }
+            if goal == own.pos
+                && own.casting.is_none()
+                && danger.is_none()
+                && !carrying
+                && let Some(ally) = state
+                    .players
+                    .iter()
+                    .filter(|ally| {
+                        ally.id != id
+                            && ally.team == own.team
+                            && ally.health > 0
+                            && ally.pos.distance_sq(own.pos) < 1000_i64.pow(2)
+                    })
+                    .min_by_key(|ally| ally.pos.distance_sq(own.pos))
+            {
+                let side = if own.pos.z == ally.pos.z {
+                    if id < ally.id { -1 } else { 1 }
+                } else {
+                    (own.pos.z - ally.pos.z).signum()
+                };
+                let spread = Pos {
+                    x: (own.pos.x + (own.pos.x - ally.pos.x).signum() * 1000).clamp(
+                        -world.content.arena.half_x + 600,
+                        world.content.arena.half_x - 600,
+                    ),
+                    z: (own.pos.z + side * 1400).clamp(
+                        -world.content.arena.half_z + 600,
+                        world.content.arena.half_z - 600,
+                    ),
+                };
+                if world.content.arena.path_clear(own.pos, spread) {
+                    goal = spread;
+                }
             }
             let mut facing_override = None;
             let mut action = "Hold casting range";
             let mut cast_slot = None;
-            if reaction_ready {
-                cast_slot = Some(if arcanist { 5 } else { 3 });
+            let ready = |slot| {
+                world.ability_id(id, slot).is_some_and(|ability| {
+                    let definition = &world.content.abilities[ability];
+                    (definition.off_gcd || private.gcd_until <= world.tick)
+                        && private.cooldowns.get(ability).copied().unwrap_or(0) <= world.tick
+                        && private.resource >= definition.cost
+                        && private
+                            .lockouts
+                            .get(&definition.school)
+                            .copied()
+                            .unwrap_or(0)
+                            <= world.tick
+                        && (definition.charges <= 1 || world.charge_count(id, ability) > 0)
+                })
+            };
+            if reaction_ready && ready(if arcanist { 7 } else { 3 }) {
+                cast_slot = Some(if arcanist { 7 } else { 3 });
                 action = "React to a visible cast";
-            } else if pressured && own.shield == 0 {
-                cast_slot = Some(if arcanist { 6 } else { 2 });
+            } else if pressured && own.shield == 0 && ready(if arcanist { 5 } else { 2 }) {
+                cast_slot = Some(if arcanist { 5 } else { 2 });
                 action = "Barrier under pressure";
-            } else if arcanist && distance < 4500_i64.pow(2) {
+            } else if arcanist && own.casting.is_none() && distance < 2700_i64.pow(2) && ready(8) {
+                cast_slot = Some(8);
+                action = "Glasswake peel / meteor setup";
+            } else if arcanist && distance < 3500_i64.pow(2) && ready(4) {
                 // Turn away first, then use the same facing-based blink as the player.
                 let angle = f64::from(own.pos.x - enemy.pos.x)
                     .atan2(f64::from(own.pos.z - enemy.pos.z))
@@ -219,19 +321,40 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                 memory.movement.2 = facing;
             } else if own.casting.is_none() && danger.is_none() {
                 if arcanist {
+                    let meteor_setup = goal == own.pos
+                        && ready(6)
+                        && (enemy.root_until > world.tick + 39
+                            || enemy
+                                .casting
+                                .as_ref()
+                                .is_some_and(|cast| cast.ends > world.tick + 39)
+                            || state
+                                .players
+                                .iter()
+                                .filter(|target| {
+                                    target.team != own.team
+                                        && target.health > 0
+                                        && target.pos.distance_sq(enemy.pos) <= 2700_i64.pow(2)
+                                })
+                                .count()
+                                >= 2);
                     cast_slot = Some(if private.chain.ready_until > world.tick {
                         3
+                    } else if meteor_setup {
+                        6
                     } else if private.chain.prepared_until > world.tick
                         && world.charge_count(id, "flashkindle") > 0
                     {
                         2
-                    } else if goal != own.pos {
+                    } else if goal != own.pos && own.root_until <= world.tick {
                         0
                     } else {
                         1
                     });
                     action = if private.chain.ready_until > world.tick {
                         "Spend instant Sunshard"
+                    } else if meteor_setup {
+                        "Crownfall on controlled / clustered enemies"
                     } else if private.chain.prepared_until > world.tick {
                         "Complete the critical chain"
                     } else if goal != own.pos {
@@ -257,11 +380,17 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                     .find(|p| p.id == id)
                     .unwrap()
                     .casting
-                    .is_some()
+                    .as_ref()
+                    .is_some_and(|cast| !world.content.abilities[&cast.ability].cast_while_moving)
             {
                 goal = own.pos;
             }
-            if own.casting.is_some() && danger.is_none() && !(ranged && distance < 3500_i64.pow(2))
+            if own
+                .casting
+                .as_ref()
+                .is_some_and(|cast| !world.content.abilities[&cast.ability].cast_while_moving)
+                && danger.is_none()
+                && !(ranged && distance < 3500_i64.pow(2))
             {
                 goal = own.pos;
             }
@@ -277,7 +406,10 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
             let (dx, dz) = direction(&world.content.arena, own.pos, goal);
             let scale = if dx != 0 && dz != 0 { 707 } else { 1000 };
             let facing = if dx == 0 && dz == 0 {
-                memory.movement.2
+                (f64::from(enemy.pos.x - own.pos.x)
+                    .atan2(f64::from(enemy.pos.z - own.pos.z))
+                    .rem_euclid(std::f64::consts::TAU)
+                    * 1000.) as u16
             } else {
                 (f64::from(dx)
                     .atan2(f64::from(dz))
@@ -291,72 +423,139 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
             );
             world.players.get_mut(&id).unwrap().view.bot_action = Some(action.into());
             // Failed casts do not reveal a hidden opponent state; try another legal action next decision.
+        } else if state.match_info.kind == "ctf" {
+            let home = &state.match_info.flags[usize::from(own.team)];
+            let carrying = state
+                .match_info
+                .flags
+                .iter()
+                .any(|flag| flag.carrier == Some(id));
+            let goal = if carrying {
+                home.home
+            } else if home.dropped_until > 0 {
+                home.pos
+            } else {
+                state.match_info.flags[usize::from(1 - own.team)].pos
+            };
+            let (dx, dz) = direction(&world.content.arena, own.pos, goal);
+            let scale = if dx != 0 && dz != 0 { 707 } else { 1000 };
+            memory.movement = (i16::from(dx) * scale, i16::from(dz) * scale, own.facing);
+            world.players.get_mut(&id).unwrap().view.bot_action =
+                Some("Run the flag while opponents respawn".into());
         }
     }
     memory.seq += 1;
     let (dx, dz, facing) = memory.movement;
     let _ = world.steer(id, memory.seq, dx, dz, facing);
 }
-fn direction(arena: &Arena, from: Pos, goal: Pos) -> (i8, i8) {
-    // Small shared collision grid, searched only for bots currently blocked by terrain.
-    let direct = (
-        if (goal.x - from.x).abs() > 250 {
-            (goal.x - from.x).signum() as i8
-        } else {
-            0
-        },
-        if (goal.z - from.z).abs() > 250 {
-            (goal.z - from.z).signum() as i8
-        } else {
-            0
-        },
-    );
-    if arena.line_of_sight(from, goal) && arena.move_step(from, direct.0, direct.1, 250) != from {
-        return direct;
-    }
-    const CELL: i32 = 1000;
-    let cell = |p: Pos| (p.x.div_euclid(CELL), p.z.div_euclid(CELL));
-    let start = cell(from);
-    let end = cell(goal);
-    let mut todo = VecDeque::from([start]);
-    let mut parents = BTreeMap::from([(start, start)]);
-    let mut found = start;
-    while let Some(at) = todo.pop_front() {
-        if at == end {
-            found = at;
-            break;
-        }
-        for d in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            let next = (at.0 + d.0, at.1 + d.1);
-            let p = Pos {
-                x: next.0 * CELL + 500,
-                z: next.1 * CELL + 500,
-            };
-            if !parents.contains_key(&next) && arena.walkable(p) {
-                parents.insert(next, at);
-                todo.push_back(next);
-            }
-        }
-        if parents.len() > 2000 {
-            break;
-        }
-    }
-    if found == start {
-        return (0, 0);
-    }
-    while parents[&found] != start {
-        found = parents[&found];
-    }
-    let p = Pos {
-        x: found.0 * CELL + 500,
-        z: found.1 * CELL + 500,
-    };
-    ((p.x - from.x).signum() as i8, (p.z - from.z).signum() as i8)
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn navigation_reaches_a_valid_goal_with_a_blocked_cell_center() {
+        let content = Content::load().unwrap();
+        let arena = &content.maps["riftwood_crossing"];
+        let mut pos = Pos { x: 0, z: 4000 };
+        let goal = Pos { x: 5700, z: 1400 };
+        assert!(arena.walkable(goal));
+        assert!(!arena.walkable(Pos { x: 5500, z: 1500 }));
+        for _ in 0..160 {
+            let (dx, dz) = direction(arena, pos, goal);
+            pos = arena.move_step(pos, dx, dz, 250);
+            assert!(arena.walkable(pos));
+        }
+        assert!(pos.distance_sq(goal) < 750_i64.pow(2), "stalled at {pos:?}");
+    }
+    #[test]
+    fn trained_mage_completes_a_legal_rotation_without_cancelling_its_filler() {
+        let mut world = World::configured(Content::load().unwrap(), "arena_1", true).unwrap();
+        world.add(1, "arcanist", 0, 0).unwrap();
+        world.add(2, "arcanist", 1, 1).unwrap();
+        world.players.get_mut(&2).unwrap().view.bot = true;
+        world.players.get_mut(&1).unwrap().view.health = 20000;
+        world.players.get_mut(&1).unwrap().view.max_health = 20000;
+        world.rules.view.bot_difficulty = BotDifficulty::Trained;
+        world.seed_combat(42);
+        let mut memory = BTreeMap::new();
+        let mut casts = std::collections::BTreeSet::new();
+        for _ in 0..700 {
+            update(&mut world, &mut memory);
+            world.step();
+            for event in &world.snapshot(2).events {
+                if event.source == 2 && event.kind == "cast" {
+                    casts.insert(event.ability.clone());
+                }
+            }
+        }
+        for ability in ["flare_lance", "flashkindle", "sunshard"] {
+            assert!(casts.contains(ability), "missing {ability}: {casts:?}");
+        }
+        assert!(world.rules.view.stats[&2].damage > 1000);
+    }
+    #[test]
+    fn trained_battleground_roster_leaves_bases_fights_and_runs_flags() {
+        let mut world = World::configured(Content::load().unwrap(), "ctf_6", true).unwrap();
+        world.rules.view.bot_difficulty = BotDifficulty::Trained;
+        world.seed_combat(42);
+        for slot in 0..12 {
+            let id = slot + 1;
+            world
+                .add(
+                    id,
+                    if (slot / 2) % 2 == 0 {
+                        "briarwarden"
+                    } else {
+                        "arcanist"
+                    },
+                    (slot % 2) as usize,
+                    (slot % 2) as u8,
+                )
+                .unwrap();
+            world.players.get_mut(&id).unwrap().view.bot = true;
+        }
+        let mut memory = BTreeMap::new();
+        let mut flag_moved = false;
+        let mut travelled = std::collections::BTreeSet::new();
+        for _ in 0..1000 {
+            update(&mut world, &mut memory);
+            world.step();
+            flag_moved |= world
+                .rules
+                .view
+                .flags
+                .iter()
+                .any(|flag| flag.carrier.is_some())
+                || world.rules.view.scores.iter().sum::<u32>() > 0;
+            for player in world.players.values() {
+                assert!(world.content.arena.walkable(player.view.pos));
+                let base = world.content.arena.spawns[usize::from(player.view.team)];
+                if player.view.pos.distance_sq(base) > 10000_i64.pow(2) {
+                    travelled.insert(player.view.id);
+                }
+            }
+        }
+        assert_eq!(travelled.len(), 12, "bots stuck near bases: {travelled:?}");
+        assert!(
+            world
+                .rules
+                .view
+                .stats
+                .values()
+                .filter(|stats| stats.damage > 0)
+                .count()
+                >= 6
+        );
+        assert!(
+            flag_moved,
+            "objective roles never reached a flag: {:?}",
+            world
+                .players
+                .values()
+                .map(|p| (p.view.id, p.view.pos, p.view.bot_action.clone()))
+                .collect::<Vec<_>>()
+        );
+    }
     #[test]
     fn trained_bot_reacts_after_delay_without_private_opponent_information() {
         let mut world = World::configured(Content::load().unwrap(), "arena_1", true).unwrap();
@@ -534,11 +733,18 @@ mod tests {
         }
         let mut sequences = BTreeMap::new();
         let mut samples = vec![];
+        let mut touched_flag = false;
         for _ in 0..1261 {
             let begin = std::time::Instant::now();
             let active = world.phase == Phase::Active;
             update(&mut world, &mut sequences);
             world.step();
+            touched_flag |= world
+                .rules
+                .view
+                .flags
+                .iter()
+                .any(|flag| flag.carrier.is_some());
             if active {
                 samples.push(begin.elapsed().as_micros());
             }
@@ -560,10 +766,7 @@ mod tests {
                 > 1000
         );
         assert!(world.rules.view.stats.values().any(|s| s.kills > 0));
-        assert!(
-            world.rules.view.flags.iter().any(|f| f.carrier.is_some())
-                || world.rules.view.scores.iter().sum::<u32>() > 0
-        );
+        assert!(touched_flag || world.rules.view.scores.iter().sum::<u32>() > 0);
         assert!(sequences.len() == 20);
         samples.sort_unstable();
         let bytes = serde_json::to_vec(&ServerMessage::State {

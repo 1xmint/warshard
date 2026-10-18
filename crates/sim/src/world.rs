@@ -1,6 +1,7 @@
 use crate::{geometry::Pos, *};
 use std::collections::{BTreeMap, VecDeque};
 mod hero;
+mod periodic;
 mod rules;
 pub use rules::Rules;
 
@@ -45,6 +46,7 @@ pub struct Player {
     shield_until: u32,
     root_stage: u8,
     root_reset: u32,
+    next_burn_chain: u32,
 }
 #[derive(Clone, Debug)]
 struct Area {
@@ -60,6 +62,7 @@ pub struct World {
     pub phase: Phase,
     pub players: BTreeMap<u32, Player>,
     areas: Vec<Area>,
+    burns: Vec<periodic::Burn>,
     next_area: u32,
     projectiles: Vec<ProjectileView>,
     events: VecDeque<CombatEvent>,
@@ -79,6 +82,7 @@ impl World {
             phase: Phase::Waiting,
             players: BTreeMap::new(),
             areas: vec![],
+            burns: vec![],
             next_area: 1,
             projectiles: vec![],
             events: VecDeque::new(),
@@ -151,6 +155,7 @@ impl World {
                 shield_until: 0,
                 root_stage: 0,
                 root_reset: 0,
+                next_burn_chain: 0,
             },
         );
         self.rules.view.stats.insert(
@@ -297,10 +302,10 @@ impl World {
             .effects
             .iter()
             .any(|effect| matches!(effect, Effect::Blink { .. }));
-        if p.cast.is_some() && slot < 5 && !blink {
+        if p.cast.is_some() && !a.off_gcd {
             return Err("already_casting");
         }
-        if slot < 5 && !blink && p.private.gcd_until > self.tick {
+        if !a.off_gcd && p.private.gcd_until > self.tick {
             return Err("global_cooldown");
         }
         if a.charges > 1 && self.charge_count(id, &ability_id) == 0 {
@@ -335,11 +340,17 @@ impl World {
         let instant = a.consumes_chain && p.private.chain.ready_until > self.tick;
         self.emit(id, target, &ability_id, "cast", 0);
         let p = self.players.get_mut(&id).unwrap();
-        if slot >= 5 || blink {
+        if blink
+            || a.effects
+                .iter()
+                .any(|effect| matches!(effect, Effect::Interrupt { .. }))
+        {
             p.cast = None;
         }
         p.private.resource -= a.cost;
-        p.private.gcd_until = p.private.gcd_until.max(self.tick + a.gcd);
+        if !a.off_gcd {
+            p.private.gcd_until = p.private.gcd_until.max(self.tick + a.gcd);
+        }
         if a.charges > 1 {
             let charge = p
                 .private
@@ -376,9 +387,14 @@ impl World {
         }
         Ok(())
     }
-    pub fn ultimate(&mut self, id: u32, form: Option<&str>) -> Result<(), &'static str> {
+    pub fn ultimate(
+        &mut self,
+        id: u32,
+        form: Option<&str>,
+        target: Option<u32>,
+    ) -> Result<(), &'static str> {
         self.actionable(id)?;
-        let p = self.players.get_mut(&id).unwrap();
+        let p = &self.players[&id];
         let class = &self.content.classes[&p.view.class_id];
         if p.view.form != class.base_form {
             return Err("already_transformed");
@@ -390,6 +406,21 @@ impl World {
         if p.private.energy < 100 {
             return Err("energy");
         }
+        let activation = self.content.forms[form].activation.clone();
+        if let Some(ability) = &activation {
+            let definition = &self.content.abilities[ability];
+            if p.private
+                .lockouts
+                .get(&definition.school)
+                .copied()
+                .unwrap_or(0)
+                > self.tick
+            {
+                return Err("school_locked");
+            }
+            self.valid_target(id, definition, target, None)?;
+        }
+        let p = self.players.get_mut(&id).unwrap();
         p.private.energy = 0;
         p.cast = None;
         p.view.form = form.into();
@@ -398,6 +429,10 @@ impl World {
             p.private.chain.ready_until = self.tick + 200;
         }
         self.emit(id, None, "spellstorm", "ascend", 0);
+        if let Some(ability) = activation {
+            let definition = self.content.abilities[&ability].clone();
+            self.launch(id, &ability, &definition, target, None);
+        }
         Ok(())
     }
     fn damage(&mut self, source: u32, target: u32, amount: i32) {
@@ -445,7 +480,22 @@ impl World {
         };
         for effect in &a.effects {
             match *effect {
-                Effect::Damage { amount } => self.strike(source, recipient, ability_id, a, amount),
+                Effect::Damage { amount } => {
+                    self.strike(source, recipient, ability_id, a, amount);
+                }
+                Effect::Splash { amount, radius } => {
+                    let center = self.players[&recipient].view.pos;
+                    self.emit(source, Some(recipient), ability_id, "detonate", 0);
+                    for target in self.enemies_in_area(source, center, radius) {
+                        self.strike(source, target, ability_id, a, amount);
+                    }
+                }
+                Effect::BurnArea { radius, .. } => {
+                    let center = self.players[&recipient].view.pos;
+                    for target in self.enemies_in_area(source, center, radius) {
+                        self.apply_burn(source, target, ability_id, effect);
+                    }
+                }
                 Effect::Blink { distance } => {
                     let destination = self.blink_destination(source, distance);
                     self.emit(source, None, ability_id, "depart", 0);
@@ -477,19 +527,48 @@ impl World {
                         self.emit(source, Some(recipient), ability_id, "interrupt", 0);
                     }
                 }
-                Effect::Root { duration } => {
-                    let p = self.players.get_mut(&recipient).unwrap();
-                    if self.tick >= p.root_reset {
-                        p.root_stage = 0;
+                Effect::Root { duration } => self.apply_root(recipient, duration),
+                Effect::RootArea { radius, duration } => {
+                    let center = self.players[&source].view.pos;
+                    let team = self.players[&source].view.team;
+                    let targets: Vec<_> = self
+                        .players
+                        .values()
+                        .filter(|player| {
+                            player.view.team != team
+                                && player.view.health > 0
+                                && player.view.pos.distance_sq(center) <= i64::from(radius).pow(2)
+                                && self.content.arena.line_of_sight(center, player.view.pos)
+                        })
+                        .map(|player| player.view.id)
+                        .collect();
+                    for target in targets {
+                        self.apply_root(target, duration);
                     }
-                    let reduced = if p.root_stage >= 3 {
-                        0
-                    } else {
-                        duration / (1 << p.root_stage)
-                    };
-                    p.root_stage = (p.root_stage + 1).min(3);
-                    p.root_reset = self.tick + 360;
-                    p.view.root_until = p.view.root_until.max(self.tick + reduced);
+                    self.emit(source, None, ability_id, "nova", 0);
+                }
+                Effect::DelayedArea {
+                    amount,
+                    radius,
+                    delay,
+                } => {
+                    let center = point.unwrap_or(self.players[&recipient].view.pos);
+                    self.areas.push(Area {
+                        view: AreaView {
+                            ability: ability_id.into(),
+                            started: self.tick,
+                            activates: self.tick + delay,
+                            id: self.next_area,
+                            owner: source,
+                            pos: center,
+                            radius,
+                            ends: self.tick + delay + 1,
+                        },
+                        amount,
+                        interval: 1,
+                        next: self.tick + delay,
+                    });
+                    self.next_area += 1;
                 }
                 Effect::Slow { duration } => {
                     let p = self.players.get_mut(&recipient).unwrap();
@@ -503,6 +582,9 @@ impl World {
                 } => {
                     self.areas.push(Area {
                         view: AreaView {
+                            ability: ability_id.into(),
+                            started: self.tick,
+                            activates: self.tick,
                             id: self.next_area,
                             owner: source,
                             pos: point.unwrap(),
@@ -518,11 +600,26 @@ impl World {
             }
         }
     }
+    fn apply_root(&mut self, target: u32, duration: u32) {
+        let player = self.players.get_mut(&target).unwrap();
+        if self.tick >= player.root_reset {
+            player.root_stage = 0;
+        }
+        let reduced = if player.root_stage >= 3 {
+            0
+        } else {
+            duration / (1 << player.root_stage)
+        };
+        player.root_stage = (player.root_stage + 1).min(3);
+        player.root_reset = self.tick + 360;
+        player.view.root_until = player.view.root_until.max(self.tick + reduced);
+    }
     fn start_countdown(&mut self) {
         self.phase = Phase::Countdown;
         self.starts_at = self.tick + 60;
         self.winner = None;
         self.areas.clear();
+        self.burns.clear();
         self.projectiles.clear();
         self.events.clear();
         self.round += 1;
@@ -550,6 +647,7 @@ impl World {
             p.view.respawn_at = 0;
             p.root_stage = 0;
             p.root_reset = 0;
+            p.next_burn_chain = 0;
             p.view.form = self.content.classes[&p.view.class_id].base_form.clone();
             p.view.form_until = 0;
             p.view.root_until = 0;
@@ -570,6 +668,7 @@ impl World {
     pub fn step(&mut self) {
         self.tick += 1;
         self.hero_tick();
+        self.periodic_tick();
         let ready = self.ready();
         match self.phase {
             Phase::Waiting if ready => self.start_countdown(),
@@ -620,7 +719,11 @@ impl World {
                         .content
                         .arena
                         .move_vector(p.view.pos, input.dx, input.dz, step);
-                    if next != p.view.pos {
+                    if next != p.view.pos
+                        && p.cast.as_ref().is_some_and(|cast| {
+                            !self.content.abilities[&cast.view.ability].cast_while_moving
+                        })
+                    {
                         p.cast = None;
                     }
                     p.view.pos = next;
@@ -666,7 +769,18 @@ impl World {
                 .map(|(id, _)| *id)
                 .collect();
             for target in targets {
-                self.damage(area.view.owner, target, area.amount);
+                if area.view.activates > area.view.started {
+                    let definition = self.content.abilities[&area.view.ability].clone();
+                    self.strike(
+                        area.view.owner,
+                        target,
+                        &area.view.ability,
+                        &definition,
+                        area.amount,
+                    );
+                } else {
+                    self.damage(area.view.owner, target, area.amount);
+                }
             }
         }
         self.step_rules();
@@ -696,6 +810,7 @@ impl World {
             match_info: self.rules.view.clone(),
             projectiles: self.projectiles.clone(),
             events: self.events.iter().cloned().collect(),
+            burns: self.burns.iter().map(|burn| burn.view.clone()).collect(),
         }
     }
 }

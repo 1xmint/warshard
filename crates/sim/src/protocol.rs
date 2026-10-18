@@ -30,6 +30,7 @@ pub enum ClientMessage {
     },
     Ultimate {
         form: Option<String>,
+        target: Option<u32>,
     },
     Queue {
         version: u32,
@@ -82,6 +83,15 @@ pub struct Snapshot {
     pub match_info: MatchView,
     pub projectiles: Vec<ProjectileView>,
     pub events: Vec<CombatEvent>,
+    pub burns: Vec<BurnView>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct BurnView {
+    pub owner: u32,
+    pub target: u32,
+    pub ability: String,
+    pub started: u32,
+    pub ends: u32,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct MatchView {
@@ -159,6 +169,9 @@ pub struct CastView {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct AreaView {
+    pub ability: String,
+    pub started: u32,
+    pub activates: u32,
     pub id: u32,
     pub owner: u32,
     pub pos: Pos,

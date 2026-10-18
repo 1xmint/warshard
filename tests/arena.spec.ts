@@ -64,7 +64,7 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   await expect.poll(() => ra.state?.phase).toBe("active");
   await a.bringToFront();
   await a.keyboard.press("Tab");
-  await expect(a.locator("#target-name")).toHaveText("Ashweaver");
+  await expect(a.locator("#target-name")).toHaveText("Ashweaver · EMBER");
   await a.keyboard.down("KeyD");
   await expect
     .poll(() => own(ra)?.pos.x ?? -5500, { timeout: 5000, intervals: [50] })
@@ -211,7 +211,7 @@ test("protocol rejects wrong versions and malformed admission", async ({
       }),
       await request({
         type: "join",
-        version: 4,
+        version: 5,
         room: "../bad",
         class_id: "briarwarden",
         resume: null,
