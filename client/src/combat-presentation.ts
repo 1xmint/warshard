@@ -115,7 +115,7 @@ export class CombatPresentation {
       if (event.id <= this.lastEvent) continue;
       this.lastEvent = event.id;
       const source = state.players.find((p) => p.id === event.source);
-      if (event.kind === "cast")
+      if (event.kind === "cast" || event.kind === "ascend")
         this.renderer.cue(event.source, source?.class_id === "briarwarden");
       if (event.kind === "cast" && event.ability === "prism_ward") {
         const shell = MeshBuilder.CreateSphere(
