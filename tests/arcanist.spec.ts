@@ -85,9 +85,9 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   await expect(page.locator("#bot-insight")).toContainText("Easy:");
   await page.getByRole("button", { name: "Skilled", exact: true }).click();
   await expect.poll(() => state!.match_info.bot_difficulty).toBe("skilled");
-  await ready();
   expect(own().private!.charges.flashkindle).toBeUndefined();
   expect(own().health).toBe(1550);
+  await ready();
   const round = state!.round;
   await page.getByRole("button", { name: "Restart duel", exact: true }).click();
   await expect.poll(() => state!.round).toBeGreaterThan(round);
