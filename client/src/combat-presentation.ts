@@ -101,6 +101,7 @@ export class CombatPresentation {
     return this.materials.get(key)!;
   }
   receive(state: Snapshot, localId: number, welcome: boolean) {
+    if (welcome) this.clear();
     this.state = state;
     this.at = performance.now();
     if (welcome) this.lastEvent = state.events.at(-1)?.id ?? 0;
@@ -281,6 +282,21 @@ export class CombatPresentation {
     while (this.bursts.length > 64)
       this.bursts.shift()!.meshes.forEach((mesh) => mesh.dispose());
     while (this.numbers.length > 32) this.numbers.shift()!.element.remove();
+  }
+  clear() {
+    for (const meshes of this.shots.values()) {
+      meshes.core.dispose(); meshes.trail.dispose(); meshes.glow.dispose();
+    }
+    this.shots.clear();
+    for (const flames of this.burnFlames.values()) flames.forEach((mesh) => mesh.dispose());
+    this.burnFlames.clear();
+    this.bursts.forEach((effect) => effect.meshes.forEach((mesh) => mesh.dispose()));
+    this.bursts = [];
+    this.numbers.forEach((number) => number.element.remove());
+    this.numbers = [];
+    this.state = null;
+    this.lastEvent = 0;
+    this.ready = false;
   }
   render() {
     const state = this.state;

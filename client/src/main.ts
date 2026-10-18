@@ -265,6 +265,7 @@ $("#join-form").onsubmit = (event) => {
   }
 };
 $("#leave").onclick = () => {
+  combat.clear();
   net.send({ type: "leave_match" });
   net.cancelQueue();
   sessionStorage.removeItem("warshard.join");
