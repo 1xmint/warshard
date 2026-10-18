@@ -592,6 +592,15 @@ renderer.engine.runRenderLoop(() => {
   );
   if (performance.now() > noticeUntil) $("#notice").textContent = "";
   const p = self();
+  const enemyCast = net.state?.players.find((enemy) => enemy.id === selectedTarget)?.casting;
+  $("#target-cast").classList.toggle("hidden", !enemyCast);
+  if (enemyCast && net.state && net.content) {
+    const tick = net.state.tick + Math.min(2, (performance.now() - stateAt) / 50);
+    const progress = Math.min(1, Math.max(0, (tick - enemyCast.started) / Math.max(1, enemyCast.ends - enemyCast.started)));
+    $("#target-cast-progress").style.transform = `scaleX(${progress})`;
+    $("#target-cast-label").textContent = `${net.content.abilities[enemyCast.ability].name} · ${Math.max(0, (enemyCast.ends - tick) / 20).toFixed(1)}s`;
+    $("#target-cast").setAttribute("aria-valuenow", String(Math.round(progress * 100)));
+  }
   const cast = p?.casting;
   const interrupted = performance.now() < castInterruptedUntil;
   $(".cast-wrap").classList.toggle("visible", !!cast || interrupted);
