@@ -30,6 +30,7 @@ fn main() {
         ChargeView,
         ProjectileView,
         CombatEvent,
-        FlagView
+        FlagView,
+        BurnView
     );
 }

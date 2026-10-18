@@ -49,6 +49,8 @@ pub struct Form {
     pub name: String,
     pub duration: u32,
     pub abilities: Vec<String>,
+    #[serde(default)]
+    pub activation: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Ability {
@@ -90,6 +92,17 @@ pub enum TargetKind {
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Effect {
+    Splash {
+        amount: i32,
+        radius: i32,
+    },
+    BurnArea {
+        amount: i32,
+        radius: i32,
+        duration: u32,
+        interval: u32,
+        proc_interval: u32,
+    },
     Blink {
         distance: i32,
     },
@@ -217,6 +230,12 @@ impl Content {
         }
         for form in self.forms.values() {
             if form.duration > 72000
+                || form.activation.as_ref().is_some_and(|id| {
+                    self.abilities
+                        .get(id)
+                        .is_none_or(|a| a.cast != 0 || a.target == TargetKind::Ground)
+                        || form.duration == 0
+                })
                 || form.abilities.len() != 5
                 || form
                     .abilities
@@ -251,6 +270,32 @@ impl Content {
             }
             for effect in &ability.effects {
                 let valid = match effect {
+                    Effect::Splash { amount, radius } => {
+                        *amount > 0
+                            && *amount <= 100_000
+                            && *radius > 0
+                            && *radius <= 10000
+                            && ability.target == TargetKind::Enemy
+                    }
+                    Effect::BurnArea {
+                        amount,
+                        radius,
+                        duration,
+                        interval,
+                        proc_interval,
+                    } => {
+                        *amount > 0
+                            && *amount <= 100_000
+                            && *radius > 0
+                            && *radius <= 10000
+                            && *duration > 0
+                            && *duration <= 72000
+                            && *interval > 0
+                            && *interval <= *duration
+                            && *proc_interval > 0
+                            && *proc_interval <= 72000
+                            && ability.target == TargetKind::Enemy
+                    }
                     Effect::Blink { distance } => {
                         *distance > 0
                             && *distance <= 8000

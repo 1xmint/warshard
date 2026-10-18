@@ -137,9 +137,9 @@ impl World {
         ability_id: &str,
         a: &Ability,
         amount: i32,
-    ) {
+    ) -> bool {
         if self.players.get(&target).is_none_or(|p| p.view.health <= 0) {
-            return;
+            return false;
         }
         self.rng ^= self.rng << 13;
         self.rng ^= self.rng >> 7;
@@ -182,6 +182,7 @@ impl World {
             if critical { "crit" } else { "hit" },
             before - after,
         );
+        critical
     }
     pub(super) fn hero_tick(&mut self) {
         while self
@@ -299,6 +300,12 @@ mod tests {
     #[test]
     fn meteor_locks_position_waits_for_impact_and_checks_teams_range_and_cover() {
         let mut world = duel();
+        world
+            .content
+            .abilities
+            .get_mut("crownfall")
+            .unwrap()
+            .crit_chance = 0;
         world.add(3, "arcanist", 0, 0).unwrap();
         world.add(4, "briarwarden", 1, 1).unwrap();
         world.players.get_mut(&2).unwrap().view.pos = Pos { x: 4000, z: 0 };
@@ -409,7 +416,7 @@ mod tests {
         assert_eq!(world.content.abilities["flare_lance"].cast, 30);
         assert_eq!(world.content.abilities["sunshard"].cast, 90);
         world.players.get_mut(&1).unwrap().private.energy = 100;
-        world.ultimate(1, None).unwrap();
+        world.ultimate(1, None, Some(2)).unwrap();
         let expires = world.players[&1].view.form_until;
         world.cast(1, 1, Some(2), None).unwrap();
         let cast = world.players[&1].cast.as_ref().unwrap();
@@ -515,8 +522,10 @@ mod tests {
         world.cast(1, 4, None, None).unwrap();
         assert!(world.players[&1].view.pos.x < -1500);
         assert!(world.content.arena.walkable(world.players[&1].view.pos));
+        // Transformation's activation projectile still requires an exposed target.
+        world.players.get_mut(&1).unwrap().view.pos = Pos { x: -5500, z: 0 };
         world.players.get_mut(&1).unwrap().private.energy = 100;
-        world.ultimate(1, None).unwrap();
+        world.ultimate(1, None, Some(2)).unwrap();
         assert_eq!(world.players[&1].view.form, "spellstorm");
         assert!(world.players[&1].private.chain.ready_until > world.tick);
         world.reset_practice(BotDifficulty::Skilled).unwrap();
@@ -530,5 +539,22 @@ mod tests {
             World::new(Content::load().unwrap()).reset_practice(BotDifficulty::Easy),
             Err("practice_only")
         );
+    }
+    #[test]
+    fn two_blink_charges_recover_sequentially_and_damage_has_no_cast_pushback() {
+        let mut world = duel();
+        world.cast(1, 1, Some(2), None).unwrap();
+        let ends = world.players[&1].cast.as_ref().unwrap().view.ends;
+        world.damage(2, 1, 40);
+        assert_eq!(world.players[&1].cast.as_ref().unwrap().view.ends, ends);
+        world.cast(1, 4, None, None).unwrap();
+        assert!(world.players[&1].cast.is_none());
+        world.cast(1, 4, None, None).unwrap();
+        assert_eq!(world.charge_count(1, "riftstep"), 0);
+        assert_eq!(world.cast(1, 4, None, None), Err("cooldown"));
+        wait(&mut world, 240);
+        assert_eq!(world.charge_count(1, "riftstep"), 1);
+        wait(&mut world, 240);
+        assert_eq!(world.charge_count(1, "riftstep"), 2);
     }
 }

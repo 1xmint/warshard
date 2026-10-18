@@ -162,6 +162,7 @@ impl World {
             p.inputs.clear();
         }
         self.areas.clear();
+        self.burns.clear();
     }
     pub(super) fn step_rules(&mut self) {
         if self.phase == Phase::Waiting && !self.rules.legacy && self.tick >= 400 {
@@ -211,6 +212,7 @@ impl World {
                 p.private.chain = ChainView::default();
                 p.private.lockouts.clear();
                 p.root_stage = 0;
+                p.next_burn_chain = 0;
                 p.root_reset = 0;
             }
             for flag in &mut self.rules.view.flags {

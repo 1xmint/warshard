@@ -122,16 +122,16 @@ fn ground_has_no_precast_warning_and_pulses_only_after_completion() {
 #[test]
 fn forms_are_content_driven_and_keep_gcd_and_expire() {
     let mut w = duel();
-    assert_eq!(w.ultimate(1, None), Err("energy"));
+    assert_eq!(w.ultimate(1, None, Some(2)), Err("energy"));
     w.players.get_mut(&1).unwrap().private.energy = 100;
     w.players.get_mut(&1).unwrap().private.gcd_until = w.tick + 10;
-    w.ultimate(1, None).unwrap();
+    w.ultimate(1, None, Some(2)).unwrap();
     assert_eq!(w.players[&1].view.form, "verdant_crown");
     assert_eq!(w.cast(1, 0, Some(2), None), Err("global_cooldown"));
     advance(&mut w, 240);
     assert_eq!(w.players[&1].view.form, "warden");
     w.players.get_mut(&2).unwrap().private.energy = 100;
-    w.ultimate(2, None).unwrap();
+    w.ultimate(2, None, Some(1)).unwrap();
     assert_eq!(w.players[&2].view.form, "solar_ascendant");
 }
 #[test]
@@ -271,9 +271,12 @@ fn additional_forms_use_the_same_validated_activation_and_expiry_path() {
         .push("alternate".into());
     w.content.validate().unwrap();
     w.players.get_mut(&1).unwrap().private.energy = 100;
-    assert_eq!(w.ultimate(1, Some("solar_ascendant")), Err("invalid_form"));
+    assert_eq!(
+        w.ultimate(1, Some("solar_ascendant"), Some(2)),
+        Err("invalid_form")
+    );
     assert_eq!(w.players[&1].private.energy, 100);
-    w.ultimate(1, Some("alternate")).unwrap();
+    w.ultimate(1, Some("alternate"), Some(2)).unwrap();
     assert_eq!(w.players[&1].view.form, "alternate");
     advance(&mut w, 10);
     assert_eq!(w.players[&1].view.form, "warden");

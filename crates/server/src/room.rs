@@ -81,7 +81,7 @@ pub(crate) async fn run_room(
                             ClientMessage::Input { seq, dx, dz } => world.input(id, seq, dx, dz),
                             ClientMessage::Steer { seq, dx, dz, facing } => world.steer(id, seq, dx, dz, facing),
                             ClientMessage::Cast { slot, target, point } => world.cast(id, slot, target, point),
-                            ClientMessage::Ultimate { form } => world.ultimate(id, form.as_deref()),
+                            ClientMessage::Ultimate { form, target } => world.ultimate(id, form.as_deref(), target),
                             ClientMessage::Mobility { target } => world.mobility(id,target),
                             ClientMessage::ResetPractice { difficulty } => world.reset_practice(difficulty),
                             _ => Err("already_joined"),

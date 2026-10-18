@@ -113,7 +113,8 @@
       ]
     },
     "spellstorm": {
-      "name": "Spellstorm",
+      "name": "Firestorm",
+      "activation": "firestorm",
       "duration": 240,
       "abilities": [
         "cinder_dart",
@@ -686,7 +687,9 @@
     },
     "crownfall": {
       "name": "Crownfall",
-      "description": "E: Cast for 0.75s, then drop a meteor after 1.2s onto the enemy's position. Deals 240 damage to enemies within 2.7m at impact. Root them with Glasswake to set up the hit.",
+      "description": "E: Cast for 0.75s, then drop a meteor after 1.2s onto the enemy's position. Deals 240 base damage to enemies within 2.7m at impact; critical hits build Kindling. Root them with Glasswake to set up the hit.",
+      "crit_chance": 30,
+      "chains": true,
       "icon": "sun",
       "target": "enemy",
       "range": 12500,
@@ -702,6 +705,26 @@
           "radius": 2700,
           "delay": 24
         }
+      ]
+    },
+    "firestorm": {
+      "name": "Firestorm",
+      "description": "Transform for 12 seconds and launch a huge fireball. It explodes for 180 base damage within 4m and ignites enemies for 22 base damage each second for 8 seconds. Burn criticals build Kindling, at most once per second across all targets. Requires an enemy target and 100 energy.",
+      "icon": "sun",
+      "target": "enemy",
+      "range": 14000,
+      "cast": 0,
+      "cooldown": 1,
+      "cost": 0,
+      "gcd": 0,
+      "school": "ember",
+      "crit_chance": 40,
+      "chains": true,
+      "off_gcd": true,
+      "projectile_step": 600,
+      "effects": [
+        { "kind": "splash", "amount": 180, "radius": 4000 },
+        { "kind": "burn_area", "amount": 22, "radius": 4000, "duration": 160, "interval": 20, "proc_interval": 20 }
       ]
     },
     "glasswake": {

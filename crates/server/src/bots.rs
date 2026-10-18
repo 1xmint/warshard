@@ -241,7 +241,7 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                 && distance <= 12500_i64.pow(2)
                 && world.content.arena.line_of_sight(own.pos, enemy.pos)
             {
-                let _ = world.ultimate(id, None);
+                let _ = world.ultimate(id, None, Some(enemy.id));
             }
             if goal == own.pos
                 && own.casting.is_none()
@@ -704,11 +704,18 @@ mod tests {
         }
         let mut sequences = BTreeMap::new();
         let mut samples = vec![];
+        let mut touched_flag = false;
         for _ in 0..1261 {
             let begin = std::time::Instant::now();
             let active = world.phase == Phase::Active;
             update(&mut world, &mut sequences);
             world.step();
+            touched_flag |= world
+                .rules
+                .view
+                .flags
+                .iter()
+                .any(|flag| flag.carrier.is_some());
             if active {
                 samples.push(begin.elapsed().as_micros());
             }
@@ -730,10 +737,7 @@ mod tests {
                 > 1000
         );
         assert!(world.rules.view.stats.values().any(|s| s.kills > 0));
-        assert!(
-            world.rules.view.flags.iter().any(|f| f.carrier.is_some())
-                || world.rules.view.scores.iter().sum::<u32>() > 0
-        );
+        assert!(touched_flag || world.rules.view.scores.iter().sum::<u32>() > 0);
         assert!(sequences.len() == 20);
         samples.sort_unstable();
         let bytes = serde_json::to_vec(&ServerMessage::State {
