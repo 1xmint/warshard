@@ -872,3 +872,17 @@ dialog p {
 .target-cast { position: relative; height: 20px; margin-top: 5px; border: 1px solid #c1a269; background: #101217; overflow: hidden; }
 #target-cast-progress { height: 100%; background: linear-gradient(#d2aa62, #885523); transform-origin: left; }
 #target-cast-label { position: absolute; inset: 2px 6px; font-size: 11px; color: #fff2d2; text-shadow: 0 1px 2px #000; }
+
+/* Shared stone, bronze and parchment treatment across combat frames. */
+.unit-content {
+  padding: 9px 10px;
+  background: linear-gradient(145deg, #262721ed, #101719ed);
+  border: 1px solid #88734e;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px #151a18, 0 3px 12px #0008;
+}
+.unit-title { color: #f2dfb5; }
+.bar { border: 1px solid #161e19; box-shadow: inset 0 1px 5px #0008; }
+.ability { border-color: #b29b695e; background: linear-gradient(145deg, #514834, #202725); box-shadow: inset 0 0 0 2px #161b1a, 0 3px 9px #0008; }
+.key { font-size: 11px; font-weight: 800; color: #fff3cf; text-shadow: 0 1px 3px #000; }
+.ability-name { color: #f2dfb5; font-size: 8px; }

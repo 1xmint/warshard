@@ -7,6 +7,11 @@ Josh authorized a cohesive low-resolution fantasy PvP overhaul, preserving menu-
 3. Spell/readability pass: differentiated bolts/trails/impacts and Spellstorm, coherent combat UI, bounded effect counts and optional quality. Prove existing two-player and battleground flows, inspect real screenshots/client presentation. PvP balance, fun and low-end performance remain playtest/measurement outcomes.
 Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no rewrite or new infrastructure is justified. Current phases: cast-bar CI validation and map implementation. The cast flow now waits for the server to acknowledge movement release before starting another cast; enemy cast progress uses public snapshots.
 
+## Spell readability — 2026-10-18
+- Arcanist projectiles use distinct elongated bright cores and warm trails. Authoritative hit/crit events produce fading rings and ember streaks; Spellstorm has a larger layered gold activation cue. Visuals never schedule or decide damage.
+- Projectile visuals are capped at 96, impact groups at 64 and floating numbers at 32. Geometry/materials are reused where practical and expired meshes are disposed. No full-scene bloom pass was added to the shared-PC/browser budget.
+- Combat frames and hotbar share a bronze, stone and parchment palette; enemy cast progress is visible for interrupt timing. Original spell names and the existing menu entry remain.
+
 ## Cast bar — 2026-10-18
 - Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. Cinder Dart remains the instant mobile attack.
 - Player cast bar shows the spell name, remaining/total seconds and a smooth fill driven by authoritative cast start/end ticks. Confirmed interrupts briefly turn it red. Instant spells do not create a fake cast bar.

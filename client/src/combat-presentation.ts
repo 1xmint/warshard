@@ -115,6 +115,20 @@ export class CombatPresentation {
           mesh.isPickable = false;
           return mesh;
         });
+        // A single line mesh supplies the burst of embers, rather than many particle draw calls.
+        if (!blink && event.kind !== "interrupt") {
+          const lines = Array.from({ length: ascension ? 12 : 7 }, (_, i) => {
+            const angle = i * 2.39996 + event.id;
+            const radius = ascension ? 1.6 : event.ability === "sunshard" ? 1.25 : 0.75;
+            const from = new Vector3(Math.cos(angle) * radius * 0.35, 0.2 + i % 3 * 0.13, Math.sin(angle) * radius * 0.35);
+            return [from, from.scale(2.1)];
+          });
+          const sparks = MeshBuilder.CreateLineSystem("impact-embers", { lines }, this.renderer.scene);
+          sparks.color = Color3.FromHexString(color);
+          sparks.position.set(event.pos.x / 1000, 0.6, event.pos.z / 1000);
+          sparks.isPickable = false;
+          meshes.push(sparks);
+        }
         this.bursts.push({
           meshes,
           born: performance.now(),
@@ -149,7 +163,9 @@ export class CombatPresentation {
     if (!state) return;
     const now = performance.now(),
       tick = state.tick + Math.min(2, (now - this.at) / 50);
-    for (const shot of state.projectiles) {
+    // Visual work has a hard ceiling independently of future match roster sizes.
+    const visibleShots = state.projectiles.slice(-96);
+    for (const shot of visibleShots) {
       let meshes = this.shots.get(shot.id);
       if (!meshes) {
         const sunshard = shot.ability === "sunshard";
@@ -190,7 +206,7 @@ export class CombatPresentation {
       meshes.trail.position.subtractInPlace(end.subtract(start).normalize().scale(shot.ability === "sunshard" ? 0.55 : 0.35));
     }
     for (const [id, mesh] of this.shots)
-      if (!state.projectiles.some((p) => p.id === id)) {
+      if (!visibleShots.some((p) => p.id === id)) {
         mesh.core.dispose();
         mesh.trail.dispose();
         this.shots.delete(id);
