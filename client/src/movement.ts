@@ -26,8 +26,10 @@ export class Prediction {
   seq = 0;
   pos: Pos = { x: 0, z: 0 };
   pending: Input[] = [];
-  reset(player: PlayerView) {
-    this.seq = player.private?.ack ?? 0;
+  reset(player: PlayerView, sameSession = false) {
+    // A round reset discards prediction, but queued inputs may be newer than
+    // the snapshot's acknowledgement. Never reuse their sequence numbers.
+    this.seq = Math.max(sameSession ? this.seq : 0, player.private?.ack ?? 0);
     this.pending = [];
     this.pos = { ...player.pos };
   }

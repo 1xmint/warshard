@@ -373,7 +373,7 @@ net.onState = (state, welcome) => {
           : "Defeat. Rise again next round.",
       );
     if (previous.round !== state.round) {
-      prediction.reset(p);
+      prediction.reset(p, true);
       controls.reset(p.facing);
       selectedTarget = null;
       cancelPlacement();
