@@ -61,6 +61,7 @@ test("menus, human queue cancellation, CTF practice, movement and recovery", asy
   await page.locator("#practice").click();
   await expect.poll(() => record.state?.phase).toBe("active");
   expect(record.state!.match_info.map).toBe("riftwood_crossing");
+  await expect(page.locator("#arena")).toHaveAttribute("data-arena-art", "kenney-forest", { timeout: 15000 });
   expect(record.state!.players).toHaveLength(12);
   expect(record.state!.players.filter((p) => p.bot)).toHaveLength(11);
   await expect(page.locator("#flag-status")).toContainText("Jade flag:");
@@ -77,6 +78,7 @@ test("menus, human queue cancellation, CTF practice, movement and recovery", asy
   await expect.poll(() => record.welcomes).toBe(2);
   expect(record.id).toBe(id);
   expect(record.state!.players.filter((p) => p.bot)).toHaveLength(11);
+  await expect(page.locator("#arena")).toHaveAttribute("data-arena-art", "kenney-forest", { timeout: 15000 });
   await page.screenshot({ path: info.outputPath("ctf-practice.png") });
   await page.locator("#leave").click();
   await expect(page.locator("#front")).toBeVisible();

@@ -14,6 +14,9 @@ export class ArenaArt {
     if (arena.half_x !== 14000) return;
     const names = [
       "floor-detail",
+      "floor",
+      "column-damaged",
+      "wall-corner",
       "wall",
       "wall-gate",
       "column",
@@ -61,9 +64,13 @@ export class ArenaArt {
       if (mesh.metadata?.arenaPlaceholder) mesh.setEnabled(false);
     for (let x = -13; x <= 13; x += 2)
       for (let z = -9; z <= 9; z += 2)
-        place("floor-detail", x, -0.12, z, 2, 1, 2);
+        // A worn central fighting floor, framed by less ornate outer flagstones.
+        place(Math.abs(x) < 9 && Math.abs(z) < 7 ? "floor-detail" : "floor", x, -0.12, z, 2, 1, 2);
     for (let x = -13; x <= 13; x += 2)
-      for (const z of [-10.6, 10.6]) place("wall", x, 0, z, 2, 1.5, 1.5);
+      for (const z of [-10.6, 10.6]) {
+        const height = Math.abs(x) > 9 ? 2.3 : Math.abs(x) < 4 ? 0.85 : 1.5;
+        place("wall", x, 0, z, 2, height, 1.5);
+      }
     for (let z = -9; z <= 9; z += 2)
       for (const x of [-14.6, 14.6])
         if (Math.abs(z) > 2) place("wall", x, 0, z, 2, 1.5, 1.5, Math.PI / 2);
@@ -74,6 +81,11 @@ export class ArenaArt {
         place("tree", x + Math.sign(x) * 2.5, -0.3, z, 2);
       }
       for (const z of [-3.3, 3.3]) place("banner", x, 0, z, 2.2);
+    }
+    // Ruined corner towers sit beyond the boundary, framing the arena without extra collision.
+    for (const x of [-15.5, 15.5]) for (const z of [-11.5, 11.5]) {
+      place("wall-corner", x, 0, z, 3, 2.5, 3, x * z > 0 ? Math.PI : 0);
+      place("column-damaged", x, 0, z, 2, 5, 2);
     }
     for (const obstacle of arena.obstacles)
       place(

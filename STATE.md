@@ -5,7 +5,7 @@ Josh authorized a cohesive low-resolution fantasy PvP overhaul, preserving menu-
 1. Combat baseline: complete cast-bar validation, consistent targeting and enemy cast feedback. Prove short/long/instant casts, interrupts, movement and repeated duels through existing authoritative scenarios and browser flows.
 2. Maps: authored stone-ruin arena and two-base forest CTF battleground, sharing a cohesive palette and licensed art. Visible cover must match server collision/LOS; walkable routes and flag objectives remain clear. Prove navigation, cover, both map loads and bot/objective play.
 3. Spell/readability pass: differentiated bolts/trails/impacts and Spellstorm, coherent combat UI, bounded effect counts and optional quality. Prove existing two-player and battleground flows, inspect real screenshots/client presentation. PvP balance, fun and low-end performance remain playtest/measurement outcomes.
-Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no rewrite or new infrastructure is justified. Current phase: 1; PR #11 has a browser failure after movement cancellation to investigate before integration.
+Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no rewrite or new infrastructure is justified. Current phases: cast-bar CI validation and map implementation. The cast flow now waits for the server to acknowledge movement release before starting another cast; enemy cast progress uses public snapshots.
 
 ## Cast bar — 2026-10-18
 - Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. Cinder Dart remains the instant mobile attack.
