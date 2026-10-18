@@ -145,6 +145,8 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
       .poll(() => (own(rb)?.private?.cooldowns.bolt ?? 0) <= rb.state!.tick)
       .toBe(true);
     const energy = own(rb)!.private!.energy;
+    // Passive/combat gain can fill the meter while waiting for the cooldown.
+    if (energy >= 100) break;
     await b.keyboard.press("Digit1");
     // This loop proves earned transformation energy. Observe the durable combat
     // result rather than a cast that may finish between cross-page browser polls.
