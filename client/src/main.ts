@@ -328,7 +328,7 @@ net.onState = (state, welcome) => {
   if (welcome) {
     prediction.reset(p);
     controls.reset(p.facing);
-    renderer.configure(net.content);
+    renderer.configure(net.content, state.match_info.map);
     menus.connected(net.content);
     $("#objectives").classList.remove("hidden");
     $("#mobility").classList.remove("hidden");

@@ -11,7 +11,6 @@ export class ArenaArt {
   private assets = new Map<string, Promise<AssetContainer>>();
   constructor(private scene: Scene) {}
   async decorate(parent: TransformNode, arena: Arena) {
-    if (arena.half_x !== 14000) return;
     const names = [
       "floor-detail",
       "floor",
