@@ -7,6 +7,6 @@ pub use content::*;
 pub use protocol::*;
 pub use world::*;
 
-pub const PROTOCOL: u32 = 5;
+pub const PROTOCOL: u32 = 6;
 pub const TICK_MS: u32 = 50;
 pub const STEP: i32 = 250;

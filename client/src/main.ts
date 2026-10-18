@@ -104,6 +104,7 @@ const errors: Record<string, string> = {
   cooldown: "That ability is recharging.",
   school_locked: "Your spell school is interrupted.",
   resource: "Not enough focus.",
+  embers: "Build three Embers before releasing your finisher.",
   already_casting: "Already casting. Move to cancel.",
   round_not_active: "Wait for the round to begin.",
   dead: "You have fallen. Check your respawn timer or match results.",
@@ -225,8 +226,8 @@ window.addEventListener("keydown", (event) => {
       ? cast(5)
       : net.send({ type: "mobility", target: selectedTarget });
   else if (event.code === "KeyE") cast(6);
-  else if (event.code === "KeyF") cast(7);
-  else if (event.code === "KeyC") cast(8);
+
+
   else if (event.code === "Escape") {
     if (placement !== null) {
       cancelPlacement();
@@ -244,6 +245,7 @@ $("#soundless").onclick = () => {
 };
 $("#close-help").onclick = () => help.close();
 $("#ultimate").onclick = ascend;
+$("#ultimate").insertAdjacentHTML("beforeend", '<span class="ascension-gauge"><i id="ult-fill"></i></span>');
 for (const card of document.querySelectorAll<HTMLButtonElement>("[data-class]"))
   card.onclick = () => {
     selectedClass = card.dataset.class!;
@@ -405,28 +407,17 @@ net.onState = (state, welcome) => {
   menus.update(state, net.id);
 };
 
-function tooltip(a: Ability, id: string) {
-  const playstyle: Record<string, string> = {
-    cinder_dart: "Mobile pressure. A normal hit starts Kindling; only a critical hit can complete it.",
-    flare_lance: "Stationary filler. Use it while safe to stand still.",
-    flashkindle: "Two guaranteed critical hits. Spend a charge to complete prepared Kindling.",
-    sunshard: "Long cast unless Kindling makes it instant. A critical hit can start a new chain.",
-    riftstep: "Blink to reposition or escape.",
-    prism_ward: "Instant shield. Off the global cooldown and does not interrupt your current cast.",
-    crownfall: "Stationary cast. Locks the enemy's position at completion; the meteor lands after a short descent and hits a small area.",
-    unweave: "Sunderflare is an instant arcane lash that deals damage and slows. If it catches a cast, it interrupts and locks that spell school.",
-    glasswake: "Instant self-centered burst that roots nearby enemies.",
-  };
+function tooltip(a: Ability, _id: string) {
   const castTime = a.cast ? `${a.cast / 20}s cast${a.cast_while_moving ? " · can move" : " · stationary"}` : "Instant";
   const gcd = a.off_gcd ? "Off global cooldown" : "Uses global cooldown";
-  return `${a.name}\n${a.description}\n${playstyle[id] ?? "Use this ability to control the pace of the duel."}\n${a.target === "own" ? "Self" : `${a.range / 1000}m range`} · ${castTime} · ${a.cooldown / 20}s cooldown · ${a.cost} focus · ${gcd}`;
+  return `${a.name}\n${a.description}\n${a.ember_cost ? `Costs ${a.ember_cost} Embers` : a.ember_gain ? `Builds ${a.ember_gain} Embers; criticals can add one` : ""}\n${a.target === "own" ? "Self" : `${a.range / 1000}m range`} · ${castTime} · ${a.cooldown / 20}s cooldown · ${a.cost} focus · ${gcd}`;
 }
 function updateIgniteBadge(selector: string, targetId: number | null, state: Snapshot) {
   const badge = $(selector);
   const end = targetId === null ? 0 : Math.max(
     0,
     ...state.burns
-      .filter((burn) => burn.target === targetId && burn.ability === "firestorm")
+      .filter((burn) => burn.target === targetId)
       .map((burn) => burn.ends),
   );
   const remaining = Math.max(0, (end - state.tick) / 20);
@@ -445,7 +436,8 @@ function updateHud() {
   $("#self-health").style.width = `${(p.health / p.max_health) * 100}%`;
   $("#self-hp").textContent =
     `${p.health} / ${p.max_health}${p.shield ? ` + ${p.shield}` : ""}`;
-  $("#resource").style.width = `${p.private.resource}%`;
+  $("#resource").style.width = `${info.ember_kit ? p.private.embers / 3 * 100 : p.private.resource}%`;
+  $("#resource").classList.toggle("ember-resource", info.ember_kit);
   $("#self-status").textContent =
     p.health <= 0
       ? "Fallen"
@@ -455,7 +447,7 @@ function updateHud() {
           ? "Slowed"
           : Object.values(p.private.lockouts).some((t) => t > tick)
             ? "Spell school interrupted"
-            : `${p.private.resource} focus`;
+            : info.ember_kit ? `${"●".repeat(p.private.embers)}${"○".repeat(3-p.private.embers)} EMBERS` : `${p.private.resource} focus`;
   const enemy = state.players.find((t) => t.id === selectedTarget);
   updateIgniteBadge("#self-ignite", p.id, state);
   updateIgniteBadge("#target-ignite", enemy?.id ?? null, state);
@@ -575,20 +567,21 @@ function updateHud() {
         : "";
     button.classList.toggle(
       "unavailable",
-      left > 0 || gcdLeft > 0 || p.private.resource < a.cost || !active(),
+      left > 0 || gcdLeft > 0 || p.private.resource < a.cost || p.private.embers < a.ember_cost || !active(),
     );
     button.classList.toggle("placing", placement === slot);
     button.classList.toggle(
       "proc-ready",
       p.class_id === "arcanist" &&
-        id === "sunshard" &&
-        p.private.chain.ready_until > tick,
+        a.ember_cost > 0 &&
+        p.private.embers >= a.ember_cost,
     );
   }
   $("#ult-energy").textContent =
     p.form_until > tick
       ? `${Math.ceil((p.form_until - tick) / 20)}s`
       : `${p.private.energy}%`;
+  $("#ult-fill").style.transform = `scaleX(${p.form_until > tick ? Math.max(0, (p.form_until-tick)/content.forms[p.form].duration) : p.private.energy/100})`;
   const ultimate = $("#ultimate");
   const arcanistFirestorm = p.class_id === "arcanist";
   ultimate.title = arcanistFirestorm

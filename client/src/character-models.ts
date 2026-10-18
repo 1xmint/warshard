@@ -3,6 +3,8 @@ import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import type { Scene } from "@babylonjs/core/scene";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { fireElemental } from "./fire-elemental";
+import type { SunView } from "./protocol";
 
 export type CharacterVisual = {
   update: (
@@ -10,6 +12,7 @@ export type CharacterVisual = {
     casting: boolean,
     dead: boolean,
     ascended: boolean,
+    sun?: SunView | null,
   ) => void;
   cue: (melee: boolean) => void;
   dispose: () => void;
@@ -23,7 +26,9 @@ export class CharacterModels {
     parent: TransformNode,
     id: number,
     melee: boolean,
+    elemental = false,
   ): Promise<CharacterVisual | null> {
+    if (elemental) return fireElemental(parent, id, this.scene);
     const kind = melee ? "Knight" : "Mage";
     if (!this.assets.has(kind))
       this.assets.set(

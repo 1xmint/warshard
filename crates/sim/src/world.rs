@@ -1,5 +1,6 @@
 use crate::{geometry::Pos, *};
 use std::collections::{BTreeMap, VecDeque};
+mod fire;
 mod hero;
 mod periodic;
 mod rules;
@@ -47,6 +48,8 @@ pub struct Player {
     root_stage: u8,
     root_reset: u32,
     next_burn_chain: u32,
+    energy_window: u32,
+    energy_earned: i32,
 }
 #[derive(Clone, Debug)]
 struct Area {
@@ -119,6 +122,7 @@ impl World {
             id,
             Player {
                 view: PlayerView {
+                    sun: None,
                     id,
                     team,
                     class_id: class_id.into(),
@@ -139,6 +143,7 @@ impl World {
                     private: None,
                 },
                 private: PrivateView {
+                    embers: 0,
                     energy: 0,
                     resource: 100,
                     gcd_until: 0,
@@ -156,6 +161,8 @@ impl World {
                 root_stage: 0,
                 root_reset: 0,
                 next_burn_chain: 0,
+                energy_window: 0,
+                energy_earned: 0,
             },
         );
         self.rules.view.stats.insert(
@@ -321,6 +328,9 @@ impl World {
         if p.private.resource < a.cost {
             return Err("resource");
         }
+        if p.private.embers < a.ember_cost {
+            return Err("embers");
+        }
         self.valid_target(id, &a, target, point)?;
         for effect in &a.effects {
             if let Effect::Blink { distance } = effect {
@@ -332,11 +342,7 @@ impl World {
                 }
             }
         }
-        let cast_ticks = if p.view.form == "spellstorm" {
-            a.cast / 2
-        } else {
-            a.cast
-        };
+        let cast_ticks = a.cast;
         let instant = a.consumes_chain && p.private.chain.ready_until > self.tick;
         self.emit(id, target, &ability_id, "cast", 0);
         let p = self.players.get_mut(&id).unwrap();
@@ -348,6 +354,7 @@ impl World {
             p.cast = None;
         }
         p.private.resource -= a.cost;
+        p.private.embers -= a.ember_cost;
         if !a.off_gcd {
             p.private.gcd_until = p.private.gcd_until.max(self.tick + a.gcd);
         }
@@ -425,8 +432,8 @@ impl World {
         p.cast = None;
         p.view.form = form.into();
         p.view.form_until = self.tick + self.content.forms[&p.view.form].duration;
-        if p.view.class_id == "arcanist" {
-            p.private.chain.ready_until = self.tick + 200;
+        if class.ember_kit {
+            p.private.embers = 3;
         }
         self.emit(id, None, "spellstorm", "ascend", 0);
         if let Some(ability) = activation {
@@ -446,8 +453,12 @@ impl World {
         t.view.shield -= absorb;
         let effective = (amount - absorb).min(t.view.health);
         t.view.health -= effective;
-        t.private.energy = (t.private.energy + (effective + absorb) / 12).min(100);
+        if !self.content.classes[&t.view.class_id].ember_kit {
+            t.private.energy = (t.private.energy + (effective + absorb) / 12).min(100);
+        }
         if t.view.health == 0 {
+            t.view.sun = None;
+            t.private.embers = 0;
             t.cast = None;
             t.inputs.clear();
             if self.rules.config.kind == "ctf" {
@@ -459,7 +470,20 @@ impl World {
         let died = t.view.health == 0;
         self.rules.view.stats.entry(source).or_default().damage += effective;
         if let Some(s) = self.players.get_mut(&source) {
-            s.private.energy = (s.private.energy + (effective + absorb) / 8).min(100);
+            if self.content.classes[&s.view.class_id].ember_kit {
+                // One pressure budget per caster, regardless of target count.
+                if s.energy_window != self.tick / 20 {
+                    s.energy_window = self.tick / 20;
+                    s.energy_earned = 0;
+                }
+                let gain = ((effective + absorb) / 6).min(8 - s.energy_earned).max(0);
+                if s.view.form_until == 0 && s.view.health > 0 {
+                    s.private.energy = (s.private.energy + gain).min(100);
+                    s.energy_earned += gain;
+                }
+            } else {
+                s.private.energy = (s.private.energy + (effective + absorb) / 8).min(100);
+            }
         }
         if died {
             self.drop_flags(target);
@@ -480,17 +504,51 @@ impl World {
         };
         for effect in &a.effects {
             match *effect {
+                Effect::DetonateBurn { percent, radius } => {
+                    self.detonate_burn(source, recipient, ability_id, percent, radius)
+                }
+                Effect::SpreadBurn { radius, targets } => {
+                    self.spread_burn(source, recipient, radius, targets)
+                }
+                Effect::SummonEcho {
+                    duration,
+                    charges,
+                    percent,
+                } => {
+                    self.players.get_mut(&source).unwrap().view.sun = Some(SunView {
+                        ends: self.tick + duration,
+                        charges,
+                        percent,
+                    });
+                    self.emit(source, None, ability_id, "summon", 0);
+                }
                 Effect::Damage { amount } => {
                     self.strike(source, recipient, ability_id, a, amount);
                 }
                 Effect::Splash { amount, radius } => {
                     let center = self.players[&recipient].view.pos;
                     self.emit(source, Some(recipient), ability_id, "detonate", 0);
-                    for target in self.enemies_in_area(source, center, radius) {
-                        self.strike(source, target, ability_id, a, amount);
+                    let mut ember_critical = false;
+                    for (index, target) in self
+                        .enemies_in_area(source, center, radius)
+                        .into_iter()
+                        .enumerate()
+                    {
+                        let mut hit = a.clone();
+                        if index > 0 {
+                            hit.ember_gain = 0;
+                        }
+                        hit.crit_embers &= !ember_critical;
+                        ember_critical |= self.strike(source, target, ability_id, &hit, amount);
                     }
                 }
                 Effect::BurnArea { radius, .. } => {
+                    if a.effects
+                        .iter()
+                        .any(|effect| matches!(effect, Effect::DelayedArea { .. }))
+                    {
+                        continue;
+                    }
                     let center = self.players[&recipient].view.pos;
                     for target in self.enemies_in_area(source, center, radius) {
                         self.apply_burn(source, target, ability_id, effect);
@@ -599,6 +657,9 @@ impl World {
                 }
             }
         }
+        if a.echoes {
+            self.echo_finisher(source, recipient, ability_id, a);
+        }
     }
     fn apply_root(&mut self, target: u32, duration: u32) {
         let player = self.players.get_mut(&target).unwrap();
@@ -648,6 +709,9 @@ impl World {
             p.root_stage = 0;
             p.root_reset = 0;
             p.next_burn_chain = 0;
+            p.energy_window = 0;
+            p.energy_earned = 0;
+            p.view.sun = None;
             p.view.form = self.content.classes[&p.view.class_id].base_form.clone();
             p.view.form_until = 0;
             p.view.root_until = 0;
@@ -657,6 +721,7 @@ impl World {
             p.private.ack = p.received_seq;
             p.private.energy = 0;
             p.private.resource = 100;
+            p.private.embers = 0;
             p.private.gcd_until = 0;
             p.private.cooldowns.clear();
             p.private.charges.clear();
@@ -690,13 +755,15 @@ impl World {
                 p.view.form = self.content.classes[&p.view.class_id].base_form.clone();
                 p.view.form_until = 0;
                 p.cast = None;
+                p.view.sun = None;
             }
             if self.tick >= p.shield_until {
                 p.view.shield = 0;
             }
             if active && p.view.health > 0 {
                 p.private.resource = (p.private.resource + 1).min(100);
-                if self.tick.is_multiple_of(20) {
+                if self.tick.is_multiple_of(20) && !self.content.classes[&p.view.class_id].ember_kit
+                {
                     p.private.energy = (p.private.energy + 1).min(100);
                 }
             }
@@ -753,6 +820,7 @@ impl World {
             }
         }
         for area in pulses {
+            let mut ember_critical = false;
             let targets: Vec<_> = self
                 .players
                 .iter()
@@ -768,16 +836,32 @@ impl World {
                 })
                 .map(|(id, _)| *id)
                 .collect();
-            for target in targets {
+            for (index, target) in targets.into_iter().enumerate() {
                 if area.view.activates > area.view.started {
-                    let definition = self.content.abilities[&area.view.ability].clone();
-                    self.strike(
+                    let mut definition = self.content.abilities[&area.view.ability].clone();
+                    if index > 0 {
+                        definition.ember_gain = 0;
+                    }
+                    definition.crit_embers &= !ember_critical;
+                    ember_critical |= self.strike(
                         area.view.owner,
                         target,
                         &area.view.ability,
                         &definition,
                         area.amount,
                     );
+                    if self.players[&target].view.health > 0 {
+                        for effect in &definition.effects {
+                            if matches!(effect, Effect::BurnArea { .. }) {
+                                self.apply_burn(
+                                    area.view.owner,
+                                    target,
+                                    &area.view.ability,
+                                    effect,
+                                );
+                            }
+                        }
+                    }
                 } else {
                     self.damage(area.view.owner, target, area.amount);
                 }

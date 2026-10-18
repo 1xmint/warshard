@@ -106,7 +106,7 @@ export class CombatPresentation {
     this.at = performance.now();
     if (welcome) this.lastEvent = state.events.at(-1)?.id ?? 0;
     const self = state.players.find((p) => p.id === localId);
-    const ready = (self?.private?.chain.ready_until ?? 0) > state.tick;
+    const ready = (self?.private?.embers ?? 0) >= 3;
     if (ready && !this.ready) {
       this.tone(1050, 0.22, true);
     }
@@ -152,11 +152,10 @@ export class CombatPresentation {
         });
       }
       const sunderflare =
-        event.ability === "unweave" &&
-        (event.kind === "hit" || event.kind === "crit");
+        event.kind === "echo";
       if (sunderflare) {
         const origin = source?.pos ?? event.pos;
-        const start = new Vector3(0, 1.15, 0);
+        const start = new Vector3(0, 2.4, 0);
         const offset = new Vector3(
           (event.pos.x - origin.x) / 1000,
           -0.1,
@@ -170,7 +169,7 @@ export class CombatPresentation {
             .add(new Vector3(0, index === 3 ? 0.32 : 0, 0)),
         );
         const arc = MeshBuilder.CreateLineSystem(
-          "sunderflare-arc",
+          "living-sun-echo",
           { lines: [lash] },
           this.renderer.scene,
         );
@@ -178,7 +177,7 @@ export class CombatPresentation {
         arc.color = Color3.FromHexString(event.kind === "crit" ? "#fff0a3" : "#ff8746");
         arc.isPickable = false;
         const flash = MeshBuilder.CreateTorus(
-          "sunderflare-impact",
+          "living-sun-impact",
           { diameter: 1.45, thickness: 0.11, tessellation: 24 },
           this.renderer.scene,
         );
@@ -199,7 +198,7 @@ export class CombatPresentation {
         const blink = event.kind === "blink" || event.kind === "depart";
         const ascension = event.kind === "ascend";
         const glasswake = event.ability === "glasswake";
-        const flashkindle = event.ability === "flashkindle" && event.kind === "crit";
+        const flashkindle = ["flashkindle", "solar_burst"].includes(event.ability) && event.kind === "crit";
         const firestormImpact = event.ability === "firestorm" && event.kind === "detonate";
         const color = blink
           ? "#8cdce8"
@@ -308,16 +307,16 @@ export class CombatPresentation {
     for (const shot of visibleShots) {
       let meshes = this.shots.get(shot.id);
       if (!meshes) {
-        const sunshard = shot.ability === "sunshard";
-        const flare = shot.ability === "flare_lance";
-        const firestorm = shot.ability === "firestorm";
+        const sunshard = ["sunshard", "worldflare"].includes(shot.ability);
+        const flare = ["flare_lance", "infernal_jet"].includes(shot.ability);
+        const firestorm = shot.ability === "firestorm", worldflare = shot.ability === "worldflare";
         const core = MeshBuilder.CreateSphere(
           `projectile-${shot.id}`,
-          { diameter: firestorm ? 0.72 : sunshard ? 0.27 : flare ? 0.17 : 0.12, segments: firestorm ? 12 : 8 },
+          { diameter: firestorm ? 0.72 : worldflare ? 0.65 : sunshard ? 0.27 : flare ? 0.17 : 0.12, segments: firestorm ? 12 : 8 },
           this.renderer.scene,
         );
         core.material = this.material(firestorm ? "#fff3bd" : sunshard ? "#fff0bd" : flare ? "#fff1bd" : "#ffe0a0");
-        core.scaling.z = firestorm ? 2 : sunshard ? 4.2 : flare ? 5.2 : 2.8;
+        core.scaling.z = firestorm ? 2 : worldflare ? 1.1 : sunshard ? 4.2 : flare ? 5.2 : 2.8;
         core.isPickable = false;
         const trail = MeshBuilder.CreateSphere(
           `projectile-trail-${shot.id}`,
@@ -327,7 +326,7 @@ export class CombatPresentation {
         trail.material = this.material(firestorm ? "#f45124" : sunshard ? "#ffad47" : flare ? "#f05a31" : "#de7940");
         trail.scaling.z = firestorm ? 8 : sunshard ? 6.5 : flare ? 8 : 4;
         trail.isPickable = false;
-        const glow = MeshBuilder.CreatePlane(`bolt-glow-${shot.id}`, { size: firestorm ? 5.8 : sunshard ? 2.7 : flare ? 1.8 : 1.1 }, this.renderer.scene);
+        const glow = MeshBuilder.CreatePlane(`bolt-glow-${shot.id}`, { size: firestorm ? 5.8 : worldflare ? 4.2 : sunshard ? 2.7 : flare ? 1.8 : 1.1 }, this.renderer.scene);
         glow.material = this.glowMaterial(firestorm ? "#ff692f" : sunshard ? "#ffbc5c" : "#ff873f");
         glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
         glow.isPickable = false;
@@ -349,7 +348,7 @@ export class CombatPresentation {
         mesh.lookAt(end);
       }
       meshes.glow.position.copyFrom(position);
-      meshes.trail.position.subtractInPlace(end.subtract(start).normalize().scale(shot.ability === "firestorm" ? 0.95 : shot.ability === "sunshard" ? 0.55 : 0.35));
+      meshes.trail.position.subtractInPlace(end.subtract(start).normalize().scale(shot.ability === "firestorm" ? 0.95 : ["sunshard", "worldflare"].includes(shot.ability) ? 0.55 : 0.35));
     }
     for (const [id, mesh] of this.shots)
       if (!visibleShots.some((p) => p.id === id)) {
@@ -360,7 +359,7 @@ export class CombatPresentation {
       }
     const ignitedTargets = new Set(
       state.burns
-        .filter((burn) => burn.ability === "firestorm" && burn.ends > tick)
+        .filter((burn) => burn.ends > tick)
         .map((burn) => burn.target),
     );
     for (const [id, flames] of this.burnFlames)

@@ -297,15 +297,12 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                         && (definition.charges <= 1 || world.charge_count(id, ability) > 0)
                 })
             };
-            if reaction_ready && ready(if arcanist { 7 } else { 3 }) {
-                cast_slot = Some(if arcanist { 7 } else { 3 });
+            if !arcanist && reaction_ready && ready(3) {
+                cast_slot = Some(3);
                 action = "React to a visible cast";
             } else if pressured && own.shield == 0 && ready(if arcanist { 5 } else { 2 }) {
                 cast_slot = Some(if arcanist { 5 } else { 2 });
                 action = "Barrier under pressure";
-            } else if arcanist && own.casting.is_none() && distance < 2700_i64.pow(2) && ready(8) {
-                cast_slot = Some(8);
-                action = "Glasswake peel / meteor setup";
             } else if arcanist && distance < 3500_i64.pow(2) && ready(4) {
                 // Turn away first, then use the same facing-based blink as the player.
                 let angle = f64::from(own.pos.x - enemy.pos.x)
@@ -319,48 +316,54 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                 }
                 action = "Turn and blink away";
                 memory.movement.2 = facing;
+            } else if arcanist
+                && private.embers < 3
+                && ready(1)
+                && distance < 12500_i64.pow(2)
+                && danger.is_none()
+            {
+                cast_slot = Some(1);
+                action = "Convert a charge into Embers";
             } else if own.casting.is_none() && danger.is_none() {
                 if arcanist {
-                    let meteor_setup = goal == own.pos
-                        && ready(6)
-                        && (enemy.root_until > world.tick + 39
-                            || enemy
-                                .casting
-                                .as_ref()
-                                .is_some_and(|cast| cast.ends > world.tick + 39)
-                            || state
-                                .players
-                                .iter()
-                                .filter(|target| {
-                                    target.team != own.team
-                                        && target.health > 0
-                                        && target.pos.distance_sq(enemy.pos) <= 2700_i64.pow(2)
-                                })
-                                .count()
-                                >= 2);
-                    cast_slot = Some(if private.chain.ready_until > world.tick {
-                        3
-                    } else if meteor_setup {
-                        6
-                    } else if private.chain.prepared_until > world.tick
-                        && world.charge_count(id, "flashkindle") > 0
-                    {
-                        2
-                    } else if goal != own.pos && own.root_until <= world.tick {
-                        0
-                    } else {
-                        1
-                    });
-                    action = if private.chain.ready_until > world.tick {
-                        "Spend instant Sunshard"
-                    } else if meteor_setup {
-                        "Crownfall on controlled / clustered enemies"
-                    } else if private.chain.prepared_until > world.tick {
-                        "Complete the critical chain"
+                    let summoned = own
+                        .sun
+                        .as_ref()
+                        .is_some_and(|sun| sun.charges > 0 && sun.ends > world.tick);
+                    cast_slot = Some(
+                        if own.form == "spellstorm" && !summoned && ready(3) && goal == own.pos {
+                            3
+                        } else if private.embers >= 3 {
+                            2
+                        } else if ready(6)
+                            && goal == own.pos
+                            && (enemy.root_until > world.tick + 39
+                                || state
+                                    .players
+                                    .iter()
+                                    .filter(|p| {
+                                        p.team != own.team
+                                            && p.health > 0
+                                            && p.pos.distance_sq(enemy.pos) < 2700_i64.pow(2)
+                                    })
+                                    .count()
+                                    >= 2)
+                        {
+                            6
+                        } else if goal != own.pos || own.form == "spellstorm" {
+                            0
+                        } else {
+                            3
+                        },
+                    );
+                    action = if private.embers >= 3 {
+                        "Spend Embers on a finisher"
+                    } else if own.form == "spellstorm" && !summoned {
+                        "Conjure a Living Sun"
                     } else if goal != own.pos {
-                        "Kite with mobile pressure"
+                        "Build Embers while moving"
                     } else {
-                        "Commit to a cast"
+                        "Commit to Furnace Bolt"
                     };
                 } else {
                     cast_slot = Some(0);
@@ -560,12 +563,18 @@ mod tests {
     fn trained_bot_reacts_after_delay_without_private_opponent_information() {
         let mut world = World::configured(Content::load().unwrap(), "arena_1", true).unwrap();
         world.add(1, "arcanist", 0, 0).unwrap();
-        world.add(2, "arcanist", 1, 1).unwrap();
+        world.add(2, "briarwarden", 1, 1).unwrap();
         world.players.get_mut(&2).unwrap().view.bot = true;
         world.rules.view.bot_difficulty = BotDifficulty::Trained;
         for _ in 0..61 {
             world.step();
         }
+        let opponent = world.players[&1].view.pos;
+        // Keep the melee interrupt in range; navigation is covered separately.
+        world.players.get_mut(&2).unwrap().view.pos = Pos {
+            x: opponent.x + 2000,
+            z: opponent.z,
+        };
         assert!(
             world
                 .snapshot(2)
@@ -576,7 +585,7 @@ mod tests {
                 .private
                 .is_none()
         );
-        world.cast(1, 1, Some(2), None).unwrap();
+        world.cast(1, 3, Some(2), None).unwrap();
         let mut memory = BTreeMap::new();
         for _ in 0..4 {
             update(&mut world, &mut memory);
@@ -592,7 +601,7 @@ mod tests {
                 .casting
                 .is_some()
         );
-        for _ in 0..16 {
+        for _ in 0..26 {
             update(&mut world, &mut memory);
             world.step();
         }

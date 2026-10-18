@@ -385,6 +385,12 @@ export class ArenaRenderer {
     if (this.mapId !== mapId || JSON.stringify(this.arena) !== JSON.stringify(content.arena)) {
       this.mapId = mapId;
       this.arena = content.arena;
+      const forest = mapId === "riftwood_crossing";
+      this.scene.clearColor = forest ? new Color4(0.25, 0.42, 0.48, 1) : new Color4(0.035, 0.065, 0.083, 1);
+      this.scene.fogColor = forest ? new Color3(0.25, 0.42, 0.48) : new Color3(0.045, 0.082, 0.101);
+      this.scene.fogDensity = forest ? 0.009 : 0.012;
+      this.camera.beta = forest ? 1.02 : 0.85;
+      this.camera.radius = forest ? 31 : 39;
       this.buildCourt(this.arena);
     }
     for (const flag of this.flagMeshes.values()) flag.dispose(false);
@@ -573,12 +579,12 @@ export class ArenaRenderer {
       labelHtml: "",
     };
     void this.models
-      .attach(root, player.id, melee)
+      .attach(root, player.id, melee, player.class_id === "arcanist")
       .then((visual) => {
         if (!visual) return;
         actor.visual = visual;
         body.setEnabled(false);
-        label.dataset.model = "kaykit";
+        label.dataset.model = player.class_id === "arcanist" ? "elemental" : "kaykit";
       })
       .catch((error) => {
         label.dataset.model = "fallback";
@@ -673,6 +679,7 @@ export class ArenaRenderer {
           !!p.casting,
           p.health <= 0,
           p.form_until > latest.tick,
+          p.sun,
         );
         actor.root.rotation.y =
           (p.id === localId ? facing : p.facing / 1000) + Math.PI;
@@ -727,7 +734,7 @@ export class ArenaRenderer {
           (f) => f.carrier === p.id,
         );
         const burnEnds = latest.burns
-          .filter((burn) => burn.target === p.id && burn.ability === "firestorm")
+          .filter((burn) => burn.target === p.id)
           .reduce((ends, burn) => Math.max(ends, burn.ends), 0);
         const igniteSeconds = Math.max(0, (burnEnds - latest.tick) / 20);
         const ignite = igniteSeconds > 0

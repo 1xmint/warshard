@@ -89,7 +89,7 @@ for (const allowLock of [true, false]) {
         ws.send(
           JSON.stringify({
             type: "join",
-            version: 5,
+            version: 6,
             room,
             class_id: "ashweaver",
             resume: null,
@@ -123,17 +123,17 @@ for (const allowLock of [true, false]) {
     await expect.poll(() => state?.phase, { timeout: 15000 }).toBe("active");
     const origin = { ...current().pos },
       facing = current().facing;
-    await page.mouse.move(650, 650);
+    await page.mouse.move(650, 550);
     const enemy = page.locator(".actor-label.enemy");
     await expect(enemy).toBeVisible();
     const hit = (await enemy.boundingBox())!;
     await page.mouse.click(hit.x + hit.width / 2, hit.y + hit.height + 28);
     await expect(page.locator("#target-frame")).toBeVisible();
     await page.keyboard.press("Escape");
-    await page.mouse.move(650, 650);
+    await page.mouse.move(650, 550);
     const before = (await enemy.boundingBox())!.x;
     await page.mouse.down({ button: "left" });
-    await page.mouse.move(760, 620, { steps: 10 });
+    await page.mouse.move(760, 520, { steps: 10 });
     await page.mouse.up({ button: "left" });
     await expect
       .poll(async () => Math.abs((await enemy.boundingBox())!.x - before))
@@ -154,7 +154,7 @@ for (const allowLock of [true, false]) {
         .poll(() => page.evaluate(() => document.pointerLockElement))
         .toBeNull();
     }
-    await page.mouse.move(690, 650, { steps: 10 });
+    await page.mouse.move(690, 550, { steps: 10 });
     await expect.poll(() => current().facing).not.toBe(facing);
     expect(current().pos).toEqual(origin);
     await page.mouse.down({ button: "left" });
@@ -315,7 +315,7 @@ for (const allowLock of [true, false]) {
       ).not.toBe("none");
     }
     if (allowLock) {
-      await page.mouse.move(650, 650);
+      await page.mouse.move(650, 550);
       await page.mouse.down({ button: "right" });
       await page.mouse.up({ button: "right" });
       await expect(page.locator("#game-cursor")).toBeVisible();
@@ -336,7 +336,7 @@ for (const allowLock of [true, false]) {
         .poll(() => page.evaluate(() => document.pointerLockElement))
         .toBeNull();
       await page.locator("#close-help").click();
-      await page.mouse.move(650, 650);
+      await page.mouse.move(650, 550);
       await page.mouse.down({ button: "right" });
       await page.mouse.up({ button: "right" });
       await expect(page.locator("#game-cursor")).toBeVisible();

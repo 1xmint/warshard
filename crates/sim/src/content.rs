@@ -16,6 +16,8 @@ pub struct Content {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Class {
+    #[serde(default)]
+    pub ember_kit: bool,
     pub name: String,
     pub description: String,
     pub base_form: String,
@@ -46,6 +48,8 @@ pub struct Playlist {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Form {
+    #[serde(default)]
+    pub crit_bonus: u8,
     pub name: String,
     pub duration: u32,
     pub abilities: Vec<String>,
@@ -54,6 +58,14 @@ pub struct Form {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Ability {
+    #[serde(default)]
+    pub ember_gain: u8,
+    #[serde(default)]
+    pub ember_cost: u8,
+    #[serde(default)]
+    pub crit_embers: bool,
+    #[serde(default)]
+    pub echoes: bool,
     pub name: String,
     pub description: String,
     pub icon: String,
@@ -92,6 +104,19 @@ pub enum TargetKind {
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Effect {
+    DetonateBurn {
+        percent: u8,
+        radius: i32,
+    },
+    SpreadBurn {
+        radius: i32,
+        targets: u8,
+    },
+    SummonEcho {
+        duration: u32,
+        charges: u8,
+        percent: u8,
+    },
     Splash {
         amount: i32,
         radius: i32,
@@ -170,7 +195,7 @@ impl Content {
     }
     pub fn validate(&self) -> Result<(), String> {
         let fail = || "invalid content reference, bounds or timing".to_string();
-        if self.version != 3
+        if self.version != 4
             || self.arena.name.is_empty()
             || self.arena.half_x <= 1000
             || self.arena.half_z <= 1000
@@ -230,6 +255,7 @@ impl Content {
         }
         for form in self.forms.values() {
             if form.duration > 72000
+                || form.crit_bonus > 100
                 || form.activation.as_ref().is_some_and(|id| {
                     self.abilities.get(id).is_none_or(|a| {
                         a.cast != 0
@@ -249,6 +275,8 @@ impl Content {
         }
         for ability in self.abilities.values() {
             if ability.crit_chance > 100
+                || ability.ember_gain > 3
+                || ability.ember_cost > 3
                 || ability.charges > 3
                 || ability.projectile_step < 0
                 || ability.projectile_step > 5000
@@ -272,6 +300,33 @@ impl Content {
             }
             for effect in &ability.effects {
                 let valid = match effect {
+                    Effect::DetonateBurn { percent, radius } => {
+                        *percent > 0
+                            && *percent <= 100
+                            && *radius > 0
+                            && *radius <= 10000
+                            && ability.target == TargetKind::Enemy
+                    }
+                    Effect::SpreadBurn { radius, targets } => {
+                        *radius > 0
+                            && *radius <= 10000
+                            && *targets > 0
+                            && *targets <= 4
+                            && ability.target == TargetKind::Enemy
+                    }
+                    Effect::SummonEcho {
+                        duration,
+                        charges,
+                        percent,
+                    } => {
+                        *duration > 0
+                            && *duration <= 1200
+                            && *charges > 0
+                            && *charges <= 5
+                            && *percent > 0
+                            && *percent <= 100
+                            && ability.target == TargetKind::Own
+                    }
                     Effect::Splash { amount, radius } => {
                         *amount > 0
                             && *amount <= 100_000
