@@ -6,7 +6,7 @@ Kit: 1 Cinder Dart, 1.0s moving cast, 50 damage, primes Kindling on a normal hit
 Utility slots are Q=5, E=6, F=7, C=8; R remains an independent ultimate. Off-GCD behavior belongs to ability definitions rather than slot numbers. Only movement, blink and interrupt cancel ordinary casts; the shield does not. Meteor aim locks when its cast completes; its area appears during descent, damages only enemies still in range/LOS at impact and is cleared on reset. Initial numbers are tuning values; fun/balance require playtests.
 
 ## Bot combat and hotbar follow-up (2026-10-18)
-Clearance-aware routing now handles valid destinations beside blocked grid centers and validates every route segment. Trained bots retain CTF flag roles, prefer exposed targets, spread away from nearby allies and check their own cooldowns before interrupts/defenses. Normal practice uses trained opponents and Arcanist caster slots; the selectable Easy duel remains. Mage priority: instant Sunshard, Flashkindle to complete Kindling, stationary Flare Lance, mobile Cinder Dart. Team badges/rings identify every combatant; GCD uses a shrinking shadow while numbers show personal cooldowns only. CI owns navigation, sustained rotation, 12-bot objective and browser proof; scoped builds run locally.
+Clearance-aware routing now handles valid destinations beside blocked grid centers and validates every route segment. Trained bots retain CTF flag roles, prefer exposed targets, spread away from nearby allies and check their own cooldowns before interrupts/defenses. Normal practice uses trained opponents and Arcanist caster slots; the selectable Easy duel remains. Mage priority: instant Sunshard, controlled/clustered-target Crownfall, Flashkindle to complete Kindling, stationary Flare Lance, mobile Cinder Dart; shield, root, blink and delayed interrupts provide survival and setup. Team badges/rings identify every combatant; GCD uses a shrinking shadow while numbers show personal cooldowns only. CI owns navigation, sustained rotation, 12-bot objective and browser proof; scoped builds run locally.
 
 ## PvP experience roadmap — 2026-10-18
 Josh authorized a cohesive low-resolution fantasy PvP overhaul, preserving menu-to-match entry and exactly two maps. The identity/assets remain original or licensed; WoW is a controls/readability/pacing reference, not a map or asset source. No accounts, progression or new modes in this pass.
@@ -18,7 +18,7 @@ Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no 
 ## Spell readability — 2026-10-18
 - Arcanist projectiles use distinct elongated bright cores, warm trails and soft additive halos from one shared 64px procedural texture. Authoritative hit/crit events produce fading rings and ember streaks; Spellstorm has a larger layered gold activation cue. Visuals never schedule or decide damage.
 - Projectile visuals are capped at 96, impact groups at 64 and floating numbers at 32. Geometry/materials are reused where practical and expired meshes are disposed. No full-scene bloom pass was added to the shared-PC/browser budget.
-- Combat frames and hotbar share a bronze, stone and parchment palette; enemy cast progress is visible for interrupt timing. Original spell names and the existing menu entry remain. Q/E share a utility row below the cast bar; the default camera is angled lower to show character bodies.
+- Combat frames and hotbar share a bronze, stone and parchment palette; enemy cast progress is visible for interrupt timing. Original spell names and the existing menu entry remain. The expanded kit now uses Q/E/F/C below the cast bar; the default camera is angled lower to show character bodies.
 
 ## Forest and arena (2026-10-18)
 - Riftwood Crossing has opposing Jade/Ember courtyards and three dirt routes. Rock clusters sit within visible gravel footprints matching the authoritative cover circles. Tall trees/camps stay outside the playable boundary; trees on the camera's side hide to keep combatants visible.
@@ -27,7 +27,7 @@ Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no 
 - PR #13 integrates the map work from #12 and spell/HUD presentation on merged cast-bar foundation #11; it owns final CI, screenshots and integration status.
 
 ## Cast bar — 2026-10-18
-- Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. Cinder Dart remains the instant mobile attack.
+- Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. The subsequent ten-key kit changes Cinder Dart to a 1-second cast that allows movement.
 - Player cast bar shows the spell name, remaining/total seconds and a smooth fill driven by authoritative cast start/end ticks. Confirmed interrupts briefly turn it red. Instant spells do not create a fake cast bar.
 - KayKit's existing CC0 casting clips remain the compatible character-animation source. Kenney Particle Pack is a verified CC0 option for future particle textures, not an imported ready-made spell system.
 
@@ -38,7 +38,7 @@ Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no 
 
 ## Decisions — 2026-10-17
 - Priority changed from expanding modes to one polished Arcanist and intelligent, adjustable solo duels. Preserve Briarwarden, Ashweaver, maps and battleground work; defer progression and talent/equipment systems.
-- Arcanist: mobile pressure, deliberate casts, a bankable two-crit preparation/payoff loop with a guaranteed-crit cooldown and bad-luck protection. One Spellstorm Ascension; Q interrupt, E barrier, five primary skills including blink. Original spell names and presentation.
+- Arcanist: mobile pressure, deliberate casts, a bankable two-crit preparation/payoff loop with a guaranteed-crit cooldown and bad-luck protection. One Spellstorm Ascension; the 2026-10-18 kit supersedes the original Q interrupt/E barrier bindings with Q shield/E meteor/F interrupt/C root. Original spell names and presentation.
 - Bots: easy remains available; trained/skilled opponents use public observations, delayed decisions and ordinary validated actions. No hidden cooldown knowledge or LLM calls. Reset stays server-authoritative and practice-only.
 - Temporary models must be cohesive and commercially redistributable at no cost. Use CC0 KayKit Adventurers characters and Kenney Mini Arena art. Kenney supplies ready-made art pieces, not a complete combat level; Warshard authors the layout. Licenses/provenance are vendored beside assets.
 - Tests run on GitHub CI; only scoped compile/lint work runs on Josh's PC.
