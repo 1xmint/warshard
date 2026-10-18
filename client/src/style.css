@@ -868,3 +868,7 @@ dialog p {
     font-size: 25px;
   }
 }
+
+.target-cast { position: relative; height: 20px; margin-top: 5px; border: 1px solid #c1a269; background: #101217; overflow: hidden; }
+#target-cast-progress { height: 100%; background: linear-gradient(#d2aa62, #885523); transform-origin: left; }
+#target-cast-label { position: absolute; inset: 2px 6px; font-size: 11px; color: #fff2d2; text-shadow: 0 1px 2px #000; }
