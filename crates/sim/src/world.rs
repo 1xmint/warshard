@@ -528,6 +528,7 @@ impl World {
                 Effect::Splash { amount, radius } => {
                     let center = self.players[&recipient].view.pos;
                     self.emit(source, Some(recipient), ability_id, "detonate", 0);
+                    let mut ember_critical = false;
                     for (index, target) in self
                         .enemies_in_area(source, center, radius)
                         .into_iter()
@@ -536,9 +537,9 @@ impl World {
                         let mut hit = a.clone();
                         if index > 0 {
                             hit.ember_gain = 0;
-                            hit.crit_embers = false;
                         }
-                        self.strike(source, target, ability_id, &hit, amount);
+                        hit.crit_embers &= !ember_critical;
+                        ember_critical |= self.strike(source, target, ability_id, &hit, amount);
                     }
                 }
                 Effect::BurnArea { radius, .. } => {
@@ -819,6 +820,7 @@ impl World {
             }
         }
         for area in pulses {
+            let mut ember_critical = false;
             let targets: Vec<_> = self
                 .players
                 .iter()
@@ -839,9 +841,9 @@ impl World {
                     let mut definition = self.content.abilities[&area.view.ability].clone();
                     if index > 0 {
                         definition.ember_gain = 0;
-                        definition.crit_embers = false;
                     }
-                    self.strike(
+                    definition.crit_embers &= !ember_critical;
+                    ember_critical |= self.strike(
                         area.view.owner,
                         target,
                         &area.view.ability,

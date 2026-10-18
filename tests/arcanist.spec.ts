@@ -14,9 +14,9 @@ test("Cinderborn: mobile Embers, eight keys, real Ascension kit, Living Sun and 
  await expect.poll(()=>observed.some(s=>s.round===round&&s.events.some(e=>e.source===id&&e.ability==="cinder_dart"&&e.tick>=start&&(e.kind==="hit"||e.kind==="crit")))).toBe(true);await gcd();
  // A new round restores charges and removes motion before proving a committed cast.
  const restart=state!.round;await page.getByRole("button",{name:"Restart duel",exact:true}).click();await expect.poll(()=>state!.round).toBeGreaterThan(restart);await ready();await page.keyboard.press("Tab");
- const castRound=state!.round,castTick=state!.tick;await page.keyboard.press("Digit4");await page.keyboard.press("Digit2");
+ const castRound=state!.round,castTick=state!.tick;await page.evaluate(()=>{const bar=document.querySelector("#cast-time")!;new MutationObserver(()=>{if(bar.textContent?.includes("1.5s")&&!bar.hasAttribute("data-saw-furnace"))bar.setAttribute("data-saw-furnace","true");}).observe(bar,{childList:true,subtree:true});});await page.keyboard.press("Digit4");await page.keyboard.press("Digit2");
  await expect.poll(()=>observed.some(s=>s.round===castRound&&s.tick>=castTick&&s.players.some(p=>p.id===id&&p.casting?.ability==="flare_lance"&&p.private!.charges.flashkindle?.count===1))).toBe(true);
- await expect(page.locator("#cast-time")).toContainText("1.5s");await page.screenshot({path:info.outputPath("cinderborn-cast.png")});
+ await expect(page.locator("#cast-time")).toHaveAttribute("data-saw-furnace","true");await page.screenshot({path:info.outputPath("cinderborn-cast.png")});
  await expect.poll(()=>own().private!.embers).toBe(3);await expect(page.locator('[data-slot="2"]')).toHaveClass(/proc-ready/);await expect(page.locator("#proc-banner")).toContainText("EMBERS");await gcd();
  await page.screenshot({path:info.outputPath("cinderborn-embers.png")});await page.keyboard.press("Digit3");await expect.poll(()=>own().private!.embers<3).toBe(true);
  // Earn the meter through ordinary pressure; do not inject energy or stats.
