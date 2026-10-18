@@ -73,6 +73,12 @@ pub struct Ability {
     pub projectile_step: i32,
     #[serde(default)]
     pub charges: u8,
+    #[serde(default)]
+    pub cast_while_moving: bool,
+    #[serde(default)]
+    pub off_gcd: bool,
+    #[serde(default)]
+    pub primes_chain: bool,
 }
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, TS, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -104,6 +110,15 @@ pub enum Effect {
         duration: u32,
     },
     Slow {
+        duration: u32,
+    },
+    DelayedArea {
+        amount: i32,
+        radius: i32,
+        delay: u32,
+    },
+    RootArea {
+        radius: i32,
         duration: u32,
     },
     Area {
@@ -142,7 +157,7 @@ impl Content {
     }
     pub fn validate(&self) -> Result<(), String> {
         let fail = || "invalid content reference, bounds or timing".to_string();
-        if self.version != 2
+        if self.version != 3
             || self.arena.name.is_empty()
             || self.arena.half_x <= 1000
             || self.arena.half_z <= 1000
@@ -154,7 +169,7 @@ impl Content {
             return Err(fail());
         }
         for class in self.classes.values() {
-            if class.utilities.len() > 2
+            if class.utilities.len() > 4
                 || class
                     .utilities
                     .iter()
@@ -224,7 +239,7 @@ impl Content {
                 || ability.range > 100_000
                 || ability.effects.is_empty()
                 || ability.cooldown == 0
-                || ability.gcd == 0
+                || (!ability.off_gcd && ability.gcd == 0)
                 || ability.cast > 1200
                 || ability.cooldown > 72000
                 || ability.school.is_empty()
@@ -253,6 +268,26 @@ impl Content {
                     | Effect::Root { duration }
                     | Effect::Slow { duration } => {
                         *duration > 0 && *duration <= 72000 && ability.target == TargetKind::Enemy
+                    }
+                    Effect::DelayedArea {
+                        amount,
+                        radius,
+                        delay,
+                    } => {
+                        *amount > 0
+                            && *amount <= 100_000
+                            && *radius > 0
+                            && *radius <= 10000
+                            && *delay > 0
+                            && *delay <= 1200
+                            && ability.target != TargetKind::Own
+                    }
+                    Effect::RootArea { radius, duration } => {
+                        *radius > 0
+                            && *radius <= 10000
+                            && *duration > 0
+                            && *duration <= 72000
+                            && ability.target == TargetKind::Own
                     }
                     Effect::Area {
                         amount,

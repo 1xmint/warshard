@@ -159,6 +159,9 @@ pub struct CastView {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct AreaView {
+    pub ability: String,
+    pub started: u32,
+    pub activates: u32,
     pub id: u32,
     pub owner: u32,
     pub pos: Pos,

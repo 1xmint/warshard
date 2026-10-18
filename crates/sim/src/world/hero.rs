@@ -163,6 +163,12 @@ impl World {
                 }
             } else {
                 chain.dry_streak = chain.dry_streak.saturating_add(1);
+                if a.primes_chain
+                    && chain.prepared_until <= self.tick
+                    && chain.ready_until <= self.tick
+                {
+                    chain.prepared_until = self.tick + 120;
+                }
             }
         }
         let damage = if critical { amount * 3 / 2 } else { amount };
@@ -338,7 +344,7 @@ mod tests {
             .crit_chance = 1;
         world.players.get_mut(&1).unwrap().private.chain.dry_streak = 3;
         world.cast(1, 0, Some(2), None).unwrap();
-        wait(&mut world, 16);
+        wait(&mut world, 40);
         assert!(world.players[&1].private.chain.prepared_until > world.tick);
         world.cast(1, 1, Some(2), None).unwrap();
         world.input(1, 1, 1, 0).unwrap();
@@ -351,7 +357,7 @@ mod tests {
         world.players.get_mut(&2).unwrap().view.class_id = "arcanist".into();
         world.players.get_mut(&2).unwrap().view.form = "arcanist".into();
         world.cast(2, 1, Some(1), None).unwrap();
-        world.cast(1, 5, Some(2), None).unwrap();
+        world.cast(1, 7, Some(2), None).unwrap();
         assert!(world.players[&1].cast.is_none() && world.players[&2].cast.is_none());
         assert_eq!(world.players[&1].private.gcd_until, gcd);
         assert!(world.players[&2].private.lockouts["ember"] > world.tick);
