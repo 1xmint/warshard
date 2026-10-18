@@ -11,8 +11,8 @@ export class CombatPresentation {
   private state: Snapshot | null = null;
   private at = 0;
   private lastEvent = 0;
-  private shots = new Map<number, Mesh>();
-  private bursts: { mesh: Mesh; born: number; life: number }[] = [];
+  private shots = new Map<number, { core: Mesh; trail: Mesh }>();
+  private bursts: { meshes: Mesh[]; born: number; life: number }[] = [];
   private numbers: { element: HTMLElement; pos: Pos; born: number }[] = [];
   private materials = new Map<string, StandardMaterial>();
   private audio: AudioContext | null = null;
@@ -94,24 +94,31 @@ export class CombatPresentation {
         )
       ) {
         const blink = event.kind === "blink" || event.kind === "depart";
-        const mesh = MeshBuilder.CreateTorus(
-          "spell-impact",
-          { diameter: 1.1, thickness: 0.1, tessellation: 20 },
-          this.renderer.scene,
-        );
-        mesh.position.set(
-          event.pos.x / 1000,
-          blink ? 0.15 : 1.1,
-          event.pos.z / 1000,
-        );
-        mesh.material = this.material(
-          blink ? "#8cdce8" : event.kind === "crit" ? "#fff0ad" : "#f39751",
-        );
-        mesh.isPickable = false;
+        const ascension = event.kind === "ascend";
+        const color = blink
+          ? "#8cdce8"
+          : ascension
+            ? "#ffc95c"
+            : event.kind === "crit"
+              ? "#fff0ad"
+              : event.ability === "sunshard"
+                ? "#ffe6a1"
+                : "#ff8746";
+        const meshes = [0, ...(ascension ? [1, 2] : [])].map((ring) => {
+          const mesh = MeshBuilder.CreateTorus(
+            "spell-impact",
+            { diameter: ascension ? 1.4 + ring * 0.55 : 1.05, thickness: ascension ? 0.12 : 0.09, tessellation: 20 },
+            this.renderer.scene,
+          );
+          mesh.position.set(event.pos.x / 1000, blink ? 0.15 : 1.05 + ring * 0.18, event.pos.z / 1000);
+          mesh.material = this.material(color);
+          mesh.isPickable = false;
+          return mesh;
+        });
         this.bursts.push({
-          mesh,
+          meshes,
           born: performance.now(),
-          life: event.kind === "ascend" ? 1200 : 450,
+          life: ascension ? 1200 : 520,
         });
       }
       if (event.amount > 0 || event.kind === "interrupt") {
@@ -133,7 +140,8 @@ export class CombatPresentation {
         else if (event.kind === "blink") this.tone(800, 0.18);
       }
     }
-    while (this.bursts.length > 64) this.bursts.shift()!.mesh.dispose();
+    while (this.bursts.length > 64)
+      this.bursts.shift()!.meshes.forEach((mesh) => mesh.dispose());
     while (this.numbers.length > 32) this.numbers.shift()!.element.remove();
   }
   render() {
@@ -142,61 +150,61 @@ export class CombatPresentation {
     const now = performance.now(),
       tick = state.tick + Math.min(2, (now - this.at) / 50);
     for (const shot of state.projectiles) {
-      let mesh = this.shots.get(shot.id);
-      if (!mesh) {
-        mesh = MeshBuilder.CreateSphere(
+      let meshes = this.shots.get(shot.id);
+      if (!meshes) {
+        const sunshard = shot.ability === "sunshard";
+        const flare = shot.ability === "flare_lance";
+        const core = MeshBuilder.CreateSphere(
           `projectile-${shot.id}`,
-          {
-            diameter:
-              shot.ability === "sunshard"
-                ? 0.7
-                : shot.ability === "flare_lance"
-                  ? 0.4
-                  : 0.23,
-            segments: 8,
-          },
+          { diameter: sunshard ? 0.27 : flare ? 0.17 : 0.12, segments: 8 },
           this.renderer.scene,
         );
-        mesh.material = this.material(
-          shot.ability === "sunshard"
-            ? "#ffe4a0"
-            : shot.ability === "flare_lance"
-              ? "#ff8a49"
-              : "#f4bb6b",
+        core.material = this.material(sunshard ? "#fff0bd" : flare ? "#fff1bd" : "#ffe0a0");
+        core.scaling.z = sunshard ? 4.2 : flare ? 5.2 : 2.8;
+        core.isPickable = false;
+        const trail = MeshBuilder.CreateSphere(
+          `projectile-trail-${shot.id}`,
+          { diameter: sunshard ? 0.36 : flare ? 0.24 : 0.17, segments: 6 },
+          this.renderer.scene,
         );
-        mesh.isPickable = false;
-        mesh.scaling.z = 1.8;
-        this.shots.set(shot.id, mesh);
+        trail.material = this.material(sunshard ? "#ffad47" : flare ? "#f05a31" : "#de7940");
+        trail.scaling.z = sunshard ? 6.5 : flare ? 8 : 4;
+        trail.isPickable = false;
+        meshes = { core, trail };
+        this.shots.set(shot.id, meshes);
       }
       const target =
         state.players.find((p) => p.id === shot.target)?.pos ?? shot.to;
       const start = new Vector3(shot.from.x / 1000, 1.25, shot.from.z / 1000),
         end = new Vector3(target.x / 1000, 1.2, target.z / 1000);
-      mesh.position.copyFrom(
-        Vector3.Lerp(
+      const progress = Math.max(0, Math.min(1, (tick - shot.started) / (shot.ends - shot.started)));
+      const position = Vector3.Lerp(
           start,
           end,
-          Math.max(
-            0,
-            Math.min(1, (tick - shot.started) / (shot.ends - shot.started)),
-          ),
-        ),
+          progress,
       );
-      mesh.lookAt(end);
+      for (const mesh of [meshes.core, meshes.trail]) {
+        mesh.position.copyFrom(position);
+        mesh.lookAt(end);
+      }
+      meshes.trail.position.subtractInPlace(end.subtract(start).normalize().scale(shot.ability === "sunshard" ? 0.55 : 0.35));
     }
     for (const [id, mesh] of this.shots)
       if (!state.projectiles.some((p) => p.id === id)) {
-        mesh.dispose();
+        mesh.core.dispose();
+        mesh.trail.dispose();
         this.shots.delete(id);
       }
     this.bursts = this.bursts.filter((effect) => {
       const age = (now - effect.born) / effect.life;
       if (age >= 1) {
-        effect.mesh.dispose();
+        effect.meshes.forEach((mesh) => mesh.dispose());
         return false;
       }
-      effect.mesh.scaling.setAll(0.5 + age * 2.5);
-      effect.mesh.visibility = 1 - age;
+      effect.meshes.forEach((mesh, i) => {
+        mesh.scaling.setAll(0.4 + age * (i === 0 ? 2.7 : 3.4));
+        mesh.visibility = Math.max(0, 1 - age);
+      });
       return true;
     });
     this.numbers = this.numbers.filter((number) => {
