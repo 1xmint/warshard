@@ -179,7 +179,7 @@ function cast(slot: number) {
 }
 function ascend() {
   cancelPlacement();
-  net.send({ type: "ultimate", form: null });
+  net.send({ type: "ultimate", form: null, target: selectedTarget });
 }
 renderer.onPick = (id, point) => {
   if (placement !== null && point) {
@@ -420,6 +420,18 @@ function tooltip(a: Ability, id: string) {
   const gcd = a.off_gcd ? "Off global cooldown" : "Uses global cooldown";
   return `${a.name}\n${a.description}\n${playstyle[id] ?? "Use this ability to control the pace of the duel."}\n${a.target === "own" ? "Self" : `${a.range / 1000}m range`} · ${castTime} · ${a.cooldown / 20}s cooldown · ${a.cost} focus · ${gcd}`;
 }
+function updateIgniteBadge(selector: string, targetId: number | null, state: Snapshot) {
+  const badge = $(selector);
+  const end = targetId === null ? 0 : Math.max(
+    0,
+    ...state.burns
+      .filter((burn) => burn.target === targetId && burn.ability === "firestorm")
+      .map((burn) => burn.ends),
+  );
+  const remaining = Math.max(0, (end - state.tick) / 20);
+  badge.classList.toggle("hidden", remaining <= 0);
+  badge.textContent = remaining > 0 ? `IGNITE · ${remaining.toFixed(1)}s` : "";
+}
 function updateHud() {
   const p = self();
   const state = net.state;
@@ -444,6 +456,8 @@ function updateHud() {
             ? "Spell school interrupted"
             : `${p.private.resource} focus`;
   const enemy = state.players.find((t) => t.id === selectedTarget);
+  updateIgniteBadge("#self-ignite", p.id, state);
+  updateIgniteBadge("#target-ignite", enemy?.id ?? null, state);
   $("#target-frame").classList.toggle("hidden", !enemy);
   if (enemy) {
     $("#target-name").textContent = `${content.classes[enemy.class_id].name} · ${enemy.team === 0 ? "JADE" : "EMBER"}`;
@@ -574,7 +588,23 @@ function updateHud() {
     p.form_until > tick
       ? `${Math.ceil((p.form_until - tick) / 20)}s`
       : `${p.private.energy}%`;
-  $("#ultimate").classList.toggle(
+  const ultimate = $("#ultimate");
+  const arcanistFirestorm = p.class_id === "arcanist";
+  ultimate.title = arcanistFirestorm
+    ? `R · ${content.abilities.firestorm.name}: at 100% energy, target an enemy to launch a fireball and transform for 12 seconds. ${content.abilities.firestorm.description}`
+    : "R · Transform when energy is full";
+  const ultimateIcon = ultimate.querySelector<HTMLElement>(".ult-icon")!;
+  const iconAbility = arcanistFirestorm ? "firestorm" : "ascend";
+  if (ultimateIcon.dataset.ability !== iconAbility) {
+    ultimateIcon.dataset.ability = iconAbility;
+    ultimateIcon.innerHTML = arcanistFirestorm
+      ? spellIcon(content.abilities.firestorm.icon, "firestorm")
+      : "✧";
+  }
+  ultimate.querySelector("small")!.textContent = arcanistFirestorm
+    ? "FIRESTORM"
+    : "ASCEND";
+  ultimate.classList.toggle(
     "ready",
     p.private.energy >= 100 && !p.form_until,
   );

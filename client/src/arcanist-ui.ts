@@ -84,7 +84,7 @@ export class ArcanistUI {
       ? `SUNSHARD READY · Press 4 · ${Math.ceil((own.private.chain.ready_until - state.tick) / 20)}s`
       : prepared
         ? `KINDLING · Your next critical completes the chain · ${Math.ceil((own.private.chain.prepared_until - state.tick) / 20)}s`
-        : "Cinder Dart builds Kindling on a normal hit · Flashkindle guarantees a critical · Sunshard spends the payoff";
+        : "Cinder Dart starts Kindling · critical hits complete it · Firestorm burn criticals can join once per second";
     if (this.proc.textContent !== text) this.proc.textContent = text;
     const sun = document.querySelector('[data-slot="3"]');
     sun?.classList.toggle("proc-ready", arcanist && ready);
