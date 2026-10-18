@@ -485,7 +485,7 @@ function updateHud() {
       button.title = tooltip(ability);
       button.dataset.slot = String(slot);
       button.setAttribute("aria-label", `${slot + 1}: ${ability.name}`);
-      button.innerHTML = `<span class="key">${slot + 1}</span><span class="ability-icon">${spellIcon(ability.icon)}</span><span class="ability-name">${ability.name}</span><span class="cooldown-shade"></span><span class="cooldown-label"></span>`;
+      button.innerHTML = `<span class="key">${slot + 1}</span><span class="ability-icon">${spellIcon(ability.icon)}</span><span class="ability-name">${ability.name}</span><span class="cooldown-shade"></span><span class="cooldown-label"></span><span class="charge-count"></span>`;
       button.onclick = () => cast(slot);
       $("#abilities").append(button);
     });
@@ -509,18 +509,15 @@ function updateHud() {
         ? 0
         : p.private.gcd_until - tick,
     );
-    const fraction = Math.min(
-      1,
-      left / (p.private.cooldowns[id] > tick ? a.cooldown : a.gcd),
-    );
-    button.querySelector<HTMLElement>(".cooldown-shade")!.style.transform =
-      `scaleY(${fraction})`;
+    button.classList.toggle("counting-down", left > 0);
     button.querySelector(".cooldown-label")!.textContent =
+      left > 0
+        ? left < 20 ? (left / 20).toFixed(1) : String(Math.ceil(left / 20))
+        : "";
+    button.querySelector(".charge-count")!.textContent =
       a.charges > 1
         ? `${p.private.charges[id]?.count ?? a.charges}/${a.charges}`
-        : left > 20
-          ? String(Math.ceil(left / 20))
-          : "";
+        : "";
     button.classList.toggle(
       "unavailable",
       left > 0 || p.private.resource < a.cost || !active(),

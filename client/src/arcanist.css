@@ -44,6 +44,31 @@
   box-shadow:
     0 0 15px #efb35688,
     inset 0 0 16px #ffca5d55;
+  animation: sunshard-glow 1s ease-in-out infinite alternate;
+}
+.ability.proc-ready::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  border: 2px solid #ffe4a0;
+  background:
+    radial-gradient(circle at 12% 18%, #fff6ca 0 2px, transparent 4px),
+    radial-gradient(circle at 88% 70%, #ffd06b 0 2px, transparent 4px),
+    radial-gradient(circle at 30% 92%, #fff6ca 0 1px, transparent 4px);
+  pointer-events: none;
+  z-index: 5;
+  animation: sunshard-sparks 0.7s ease-in-out infinite alternate;
+}
+@keyframes sunshard-glow {
+  to { box-shadow: 0 0 27px #ffc45dbb, inset 0 0 22px #ffca5d88; }
+}
+@keyframes sunshard-sparks {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ability.proc-ready, .ability.proc-ready::after { animation: none; }
 }
 .duel-controls {
   position: fixed;
