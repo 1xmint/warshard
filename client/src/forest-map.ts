@@ -34,10 +34,13 @@ export class ForestMap {
     box("forest-floor", 0, 0, hx * 2, hz * 2, "#45513a");
     box("forest-earth", 0, 0, 90, 75, "#24352e", -0.6, 0.6);
     // Three readable routes join the two bases. Dirt is decorative and fully walkable.
-    for (const z of [-10.5, 0, 10.5]) box("dirt-lane", 0, z, hx * 2, z === 0 ? 5 : 3.8, "#827052", -0.015, 0.04);
+    for (const z of [-10.5, 0, 10.5]) for (let i = 0; i < 8; i++) {
+      const segment = box("dirt-lane", -hx + 3.25 + i * 6.5, z + Math.sin(i * 1.7) * 0.35, 7.2, (z === 0 ? 4.7 : 3.6) + i % 3 * 0.2, "#55462f", -0.015, 0.04);
+      segment.rotation.y = Math.sin(i * 2.3) * 0.035;
+    }
     for (const x of [-21, 21]) {
-      box("base-courtyard", x, 0, 8, 12, "#777968", 0.005, 0.05);
-      box("base-crossing", x, 0, 4, hz * 2, "#827052", -0.005, 0.04);
+      box("base-courtyard", x, 0, 8, 12, "#52574d", 0.005, 0.05);
+      box("base-crossing", x, 0, 4, hz * 2, "#55462f", -0.005, 0.04);
       const color = x < 0 ? "#55aa98" : "#d17955";
       for (const z of [-5, 5]) {
         box("standard-post", x, z, 0.16, 0.16, "#66513c", 1.7, 3.4);
@@ -47,15 +50,19 @@ export class ForestMap {
     // Rock silhouettes occupy exactly the server's circular cover footprint.
     for (const obstacle of arena.obstacles) {
       const radius = obstacle.radius / 1000;
-      const mesh = MeshBuilder.CreateCylinder("forest-cover", { diameter: radius * 2, diameterTop: radius * 1.65, height: 2.7, tessellation: 12 }, this.scene);
+      const mesh = MeshBuilder.CreateCylinder("forest-cover", { diameter: radius * 2, diameterTop: radius * 1.8, height: 2.7, tessellation: 12 }, this.scene);
       mesh.position.set(obstacle.pos.x / 1000, 1.32, obstacle.pos.z / 1000);
       mesh.material = mat("#637064"); mesh.parent = root; mesh.isPickable = false;
+      mesh.metadata = { coverFallback: true };
+      const footprint = MeshBuilder.CreateCylinder("rocky-cover-footprint", { diameter: radius * 2, height: 0.14, tessellation: 12 }, this.scene);
+      footprint.position.set(obstacle.pos.x / 1000, 0.03, obstacle.pos.z / 1000);
+      footprint.material = mat("#57604b"); footprint.parent = root; footprint.isPickable = false;
     }
     // A low boundary marks the authoritative edge; forest scenery stays outside it.
     for (const z of [-hz - 0.25, hz + 0.25]) box("forest-boundary", 0, z, hx * 2 + 1, 0.45, "#536447", 0.15, 0.5);
     for (const x of [-hx - 0.25, hx + 0.25]) box("forest-boundary", x, 0, 0.45, hz * 2, "#536447", 0.15, 0.5);
     const batches = new Map<StandardMaterial, Mesh[]>();
-    for (const mesh of root.getChildMeshes()) if (mesh instanceof Mesh && mesh.material instanceof StandardMaterial) {
+    for (const mesh of root.getChildMeshes()) if (mesh instanceof Mesh && mesh.material instanceof StandardMaterial && !mesh.metadata?.coverFallback) {
       mesh.computeWorldMatrix(true);
       const group = batches.get(mesh.material) ?? []; group.push(mesh); batches.set(mesh.material, group);
     }
@@ -90,8 +97,10 @@ export class ForestMap {
     for (let z = -hz; z <= hz; z += 4) for (const sign of [-1, 1]) place("tree_pineTallA", sign * (hx + 3.3), z, 6, 6, 6, z);
     for (const obstacle of arena.obstacles) {
       const r = obstacle.radius / 1000;
-      // Mesh fits inside the collision marker; the solid base remains visible and honest.
-      place("rock_largeB", obstacle.pos.x / 1000, obstacle.pos.z / 1000, r * 1.65, 4, r * 1.65, 0, 1.3);
+      // A low gravel footprint marks the exact authoritative circle. Rock clusters fit within it.
+      const x = obstacle.pos.x / 1000, z = obstacle.pos.z / 1000;
+      place("rock_largeB", x, z, r * 1.55, 6.8, r * 1.55, 0, 0.3);
+      for (const sign of [-1, 1]) place("rock_largeB", x + sign * r * 0.4, z, r * 0.8, 3.8, r * 0.8, 0, 0.15);
     }
     for (const sign of [-1, 1]) {
       place("tent_detailedOpen", sign * (hx + 2.7), -6, 5, 5, 5, -sign * Math.PI / 2);
@@ -102,6 +111,7 @@ export class ForestMap {
       if (Math.abs(z) < 3 || Math.abs(Math.abs(z) - 10.5) < 2.4 || Math.abs(x) > 17) continue;
       place(i % 4 ? "grass_large" : "flower_purpleA", x, z, 1.2, 1.2, 1.2, i);
     }
+    for (const mesh of parent.getChildMeshes()) if (mesh.metadata?.coverFallback) mesh.setEnabled(false);
     document.querySelector<HTMLCanvasElement>("#arena")!.dataset.arenaArt = "kenney-forest";
   }
 }

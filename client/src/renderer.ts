@@ -76,7 +76,7 @@ export class ArenaRenderer {
     this.camera = new ArcRotateCamera(
       "camera",
       -Math.PI / 2,
-      0.55,
+      0.85,
       39,
       new Vector3(0, 0, 0),
       this.scene,

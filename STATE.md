@@ -10,7 +10,7 @@ Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no 
 ## Spell readability — 2026-10-18
 - Arcanist projectiles use distinct elongated bright cores, warm trails and soft additive halos from one shared 64px procedural texture. Authoritative hit/crit events produce fading rings and ember streaks; Spellstorm has a larger layered gold activation cue. Visuals never schedule or decide damage.
 - Projectile visuals are capped at 96, impact groups at 64 and floating numbers at 32. Geometry/materials are reused where practical and expired meshes are disposed. No full-scene bloom pass was added to the shared-PC/browser budget.
-- Combat frames and hotbar share a bronze, stone and parchment palette; enemy cast progress is visible for interrupt timing. Original spell names and the existing menu entry remain.
+- Combat frames and hotbar share a bronze, stone and parchment palette; enemy cast progress is visible for interrupt timing. Original spell names and the existing menu entry remain. Q/E share a utility row below the cast bar; the default camera is angled lower to show character bodies.
 
 ## Cast bar — 2026-10-18
 - Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. Cinder Dart remains the instant mobile attack.
