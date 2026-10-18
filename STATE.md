@@ -10,7 +10,7 @@
 ## Current state
 - Existing online 3D combat and team/CTF practice are on PR #7, stacked on foundation PR #6. New Arcanist work starts from #7 in codex/arcanist-duels.
 - WoW-style steering and session-held cursor capture work in Josh's Brave browser. Cursor event work is batched per display frame. Slight lag was reported; Brave FPS/network latency are not measured.
-- PR #7's Linux cursor chord regression was fixed by recognizing Pointer Events chord transitions; CI is running. Foundation #6 previously passed CI.
+- PR #7's Linux cursor chord regression was fixed by recognizing Pointer Events chord transitions; the next run reached the suite-wide five-minute limit without an assertion failure. Suite budget is now ten minutes (individual checks unchanged). Foundation #6 previously passed CI.
 - The Arcanist milestone is not implemented yet. Do not present design choices as playtested fun.
 
 ## Next slices
