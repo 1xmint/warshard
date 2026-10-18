@@ -224,7 +224,7 @@ export class ForestMap {
         const a = random() * Math.PI * 2, w = 0.035 + random() * 0.035, h = 0.18 + random() * 0.22;
         const dx = Math.cos(a) * w, dz = Math.sin(a) * w, lean = 0.04 + random() * 0.07, n = positions.length / 3;
         positions.push(x - dx, 0.005, z - dz, x + dx, 0.005, z + dz, x + Math.sin(a) * lean, h, z + Math.cos(a) * lean);
-        indices.push(n, n + 1, n + 2, n + 2, n + 1, n);
+        indices.push(n, n + 1, n + 2);
         for (let v = 0; v < 3; v++) colors.push(shade[0], shade[1], shade[2], 1);
       }
     }
@@ -233,6 +233,7 @@ export class ForestMap {
     const data = new VertexData(); data.positions = positions; data.indices = indices; data.colors = colors;
     data.normals = []; VertexData.ComputeNormals(positions, indices, data.normals); data.applyToMesh(mesh, false);
     const material = new StandardMaterial("forest-grass", this.scene); material.backFaceCulling = false; material.specularColor = Color3.Black();
+    material.emissiveColor = new Color3(0.12, 0.18, 0.07);
     mesh.material = material;
     mesh.onDisposeObservable.add(() => material.dispose());
   }
