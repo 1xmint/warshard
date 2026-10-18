@@ -33,7 +33,9 @@ export class ArcanistUI {
     this.barrier.className = "arcanist-barrier hidden";
     this.barrier.textContent = "E · Prism Ward";
     this.barrier.onclick = actions.barrier;
-    document.body.append(this.proc, this.panel, this.barrier);
+    document.querySelector("#hud")!.prepend(this.proc);
+    document.querySelector("#utility-actions")!.append(this.barrier);
+    document.body.append(this.panel);
     for (const button of this.panel.querySelectorAll<HTMLButtonElement>(
       "[data-difficulty]",
     ))

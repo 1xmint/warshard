@@ -144,9 +144,11 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
     await expect
       .poll(() => (own(rb)?.private?.cooldowns.bolt ?? 0) <= rb.state!.tick)
       .toBe(true);
+    const energy = own(rb)!.private!.energy;
     await b.keyboard.press("Digit1");
-    await expect.poll(() => own(rb)?.casting?.ability).toBe("bolt");
-    await expect.poll(() => own(rb)?.casting).toBeNull();
+    // This loop proves earned transformation energy. Observe the durable combat
+    // result rather than a cast that may finish between cross-page browser polls.
+    await expect.poll(() => own(rb)!.private!.energy).toBeGreaterThan(energy);
     expect(rb.state!.phase).toBe("active");
   }
   await b.keyboard.press("KeyR");

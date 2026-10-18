@@ -2,7 +2,9 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { Constants } from "@babylonjs/core/Engines/constants";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Snapshot, Pos } from "./protocol";
 import type { ArenaRenderer } from "./renderer";
 
@@ -11,10 +13,11 @@ export class CombatPresentation {
   private state: Snapshot | null = null;
   private at = 0;
   private lastEvent = 0;
-  private shots = new Map<number, Mesh>();
-  private bursts: { mesh: Mesh; born: number; life: number }[] = [];
+  private shots = new Map<number, { core: Mesh; trail: Mesh; glow: Mesh }>();
+  private bursts: { meshes: Mesh[]; born: number; life: number }[] = [];
   private numbers: { element: HTMLElement; pos: Pos; born: number }[] = [];
   private materials = new Map<string, StandardMaterial>();
+  private halo: DynamicTexture | null = null;
   private audio: AudioContext | null = null;
   private voices = 0;
   private ready = false;
@@ -72,6 +75,30 @@ export class CombatPresentation {
     }
     return this.materials.get(color)!;
   }
+  private glowMaterial(color: string) {
+    const key = `halo-${color}`;
+    if (!this.materials.has(key)) {
+      if (!this.halo) {
+        this.halo = new DynamicTexture("spell-halo", 64, this.renderer.scene, false);
+        const context = this.halo.getContext() as CanvasRenderingContext2D;
+        const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gradient.addColorStop(0, "rgba(255,255,255,0.65)");
+        gradient.addColorStop(0.25, "rgba(255,255,255,0.25)");
+        gradient.addColorStop(1, "rgba(255,255,255,0)");
+        context.fillStyle = gradient; context.fillRect(0, 0, 64, 64);
+        this.halo.hasAlpha = true; this.halo.update();
+      }
+      const material = new StandardMaterial(key, this.renderer.scene);
+      material.emissiveColor = Color3.FromHexString(color);
+      material.diffuseTexture = this.halo;
+      material.useAlphaFromDiffuseTexture = true;
+      material.disableLighting = true; material.disableDepthWrite = true;
+      material.alphaMode = Constants.ALPHA_ADD;
+      material.backFaceCulling = false;
+      this.materials.set(key, material);
+    }
+    return this.materials.get(key)!;
+  }
   receive(state: Snapshot, localId: number, welcome: boolean) {
     this.state = state;
     this.at = performance.now();
@@ -94,24 +121,45 @@ export class CombatPresentation {
         )
       ) {
         const blink = event.kind === "blink" || event.kind === "depart";
-        const mesh = MeshBuilder.CreateTorus(
-          "spell-impact",
-          { diameter: 1.1, thickness: 0.1, tessellation: 20 },
-          this.renderer.scene,
-        );
-        mesh.position.set(
-          event.pos.x / 1000,
-          blink ? 0.15 : 1.1,
-          event.pos.z / 1000,
-        );
-        mesh.material = this.material(
-          blink ? "#8cdce8" : event.kind === "crit" ? "#fff0ad" : "#f39751",
-        );
-        mesh.isPickable = false;
+        const ascension = event.kind === "ascend";
+        const color = blink
+          ? "#8cdce8"
+          : ascension
+            ? "#ffc95c"
+            : event.kind === "crit"
+              ? "#fff0ad"
+              : event.ability === "sunshard"
+                ? "#ffe6a1"
+                : "#ff8746";
+        const meshes = [0, ...(ascension ? [1, 2] : [])].map((ring) => {
+          const mesh = MeshBuilder.CreateTorus(
+            "spell-impact",
+            { diameter: ascension ? 1.4 + ring * 0.55 : 1.05, thickness: ascension ? 0.12 : 0.09, tessellation: 20 },
+            this.renderer.scene,
+          );
+          mesh.position.set(event.pos.x / 1000, blink ? 0.15 : 1.05 + ring * 0.18, event.pos.z / 1000);
+          mesh.material = this.material(color);
+          mesh.isPickable = false;
+          return mesh;
+        });
+        // A single line mesh supplies the burst of embers, rather than many particle draw calls.
+        if (!blink && event.kind !== "interrupt") {
+          const lines = Array.from({ length: ascension ? 12 : 7 }, (_, i) => {
+            const angle = i * 2.39996 + event.id;
+            const radius = ascension ? 1.6 : event.ability === "sunshard" ? 1.25 : 0.75;
+            const from = new Vector3(Math.cos(angle) * radius * 0.35, 0.2 + i % 3 * 0.13, Math.sin(angle) * radius * 0.35);
+            return [from, from.scale(2.1)];
+          });
+          const sparks = MeshBuilder.CreateLineSystem("impact-embers", { lines }, this.renderer.scene);
+          sparks.color = Color3.FromHexString(color);
+          sparks.position.set(event.pos.x / 1000, 0.6, event.pos.z / 1000);
+          sparks.isPickable = false;
+          meshes.push(sparks);
+        }
         this.bursts.push({
-          mesh,
+          meshes,
           born: performance.now(),
-          life: event.kind === "ascend" ? 1200 : 450,
+          life: ascension ? 1200 : 520,
         });
       }
       if (event.amount > 0 || event.kind === "interrupt") {
@@ -133,7 +181,8 @@ export class CombatPresentation {
         else if (event.kind === "blink") this.tone(800, 0.18);
       }
     }
-    while (this.bursts.length > 64) this.bursts.shift()!.mesh.dispose();
+    while (this.bursts.length > 64)
+      this.bursts.shift()!.meshes.forEach((mesh) => mesh.dispose());
     while (this.numbers.length > 32) this.numbers.shift()!.element.remove();
   }
   render() {
@@ -141,62 +190,70 @@ export class CombatPresentation {
     if (!state) return;
     const now = performance.now(),
       tick = state.tick + Math.min(2, (now - this.at) / 50);
-    for (const shot of state.projectiles) {
-      let mesh = this.shots.get(shot.id);
-      if (!mesh) {
-        mesh = MeshBuilder.CreateSphere(
+    // Visual work has a hard ceiling independently of future match roster sizes.
+    const visibleShots = state.projectiles.slice(-96);
+    for (const shot of visibleShots) {
+      let meshes = this.shots.get(shot.id);
+      if (!meshes) {
+        const sunshard = shot.ability === "sunshard";
+        const flare = shot.ability === "flare_lance";
+        const core = MeshBuilder.CreateSphere(
           `projectile-${shot.id}`,
-          {
-            diameter:
-              shot.ability === "sunshard"
-                ? 0.7
-                : shot.ability === "flare_lance"
-                  ? 0.4
-                  : 0.23,
-            segments: 8,
-          },
+          { diameter: sunshard ? 0.27 : flare ? 0.17 : 0.12, segments: 8 },
           this.renderer.scene,
         );
-        mesh.material = this.material(
-          shot.ability === "sunshard"
-            ? "#ffe4a0"
-            : shot.ability === "flare_lance"
-              ? "#ff8a49"
-              : "#f4bb6b",
+        core.material = this.material(sunshard ? "#fff0bd" : flare ? "#fff1bd" : "#ffe0a0");
+        core.scaling.z = sunshard ? 4.2 : flare ? 5.2 : 2.8;
+        core.isPickable = false;
+        const trail = MeshBuilder.CreateSphere(
+          `projectile-trail-${shot.id}`,
+          { diameter: sunshard ? 0.36 : flare ? 0.24 : 0.17, segments: 6 },
+          this.renderer.scene,
         );
-        mesh.isPickable = false;
-        mesh.scaling.z = 1.8;
-        this.shots.set(shot.id, mesh);
+        trail.material = this.material(sunshard ? "#ffad47" : flare ? "#f05a31" : "#de7940");
+        trail.scaling.z = sunshard ? 6.5 : flare ? 8 : 4;
+        trail.isPickable = false;
+        const glow = MeshBuilder.CreatePlane(`bolt-glow-${shot.id}`, { size: sunshard ? 2.7 : flare ? 1.8 : 1.1 }, this.renderer.scene);
+        glow.material = this.glowMaterial(sunshard ? "#ffbc5c" : "#ff873f");
+        glow.billboardMode = Mesh.BILLBOARDMODE_ALL;
+        glow.isPickable = false;
+        meshes = { core, trail, glow };
+        this.shots.set(shot.id, meshes);
       }
       const target =
         state.players.find((p) => p.id === shot.target)?.pos ?? shot.to;
       const start = new Vector3(shot.from.x / 1000, 1.25, shot.from.z / 1000),
         end = new Vector3(target.x / 1000, 1.2, target.z / 1000);
-      mesh.position.copyFrom(
-        Vector3.Lerp(
+      const progress = Math.max(0, Math.min(1, (tick - shot.started) / (shot.ends - shot.started)));
+      const position = Vector3.Lerp(
           start,
           end,
-          Math.max(
-            0,
-            Math.min(1, (tick - shot.started) / (shot.ends - shot.started)),
-          ),
-        ),
+          progress,
       );
-      mesh.lookAt(end);
+      for (const mesh of [meshes.core, meshes.trail]) {
+        mesh.position.copyFrom(position);
+        mesh.lookAt(end);
+      }
+      meshes.glow.position.copyFrom(position);
+      meshes.trail.position.subtractInPlace(end.subtract(start).normalize().scale(shot.ability === "sunshard" ? 0.55 : 0.35));
     }
     for (const [id, mesh] of this.shots)
-      if (!state.projectiles.some((p) => p.id === id)) {
-        mesh.dispose();
+      if (!visibleShots.some((p) => p.id === id)) {
+        mesh.core.dispose();
+        mesh.trail.dispose();
+        mesh.glow.dispose();
         this.shots.delete(id);
       }
     this.bursts = this.bursts.filter((effect) => {
       const age = (now - effect.born) / effect.life;
       if (age >= 1) {
-        effect.mesh.dispose();
+        effect.meshes.forEach((mesh) => mesh.dispose());
         return false;
       }
-      effect.mesh.scaling.setAll(0.5 + age * 2.5);
-      effect.mesh.visibility = 1 - age;
+      effect.meshes.forEach((mesh, i) => {
+        mesh.scaling.setAll(0.4 + age * (i === 0 ? 2.7 : 3.4));
+        mesh.visibility = Math.max(0, 1 - age);
+      });
       return true;
     });
     this.numbers = this.numbers.filter((number) => {

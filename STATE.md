@@ -5,7 +5,18 @@ Josh authorized a cohesive low-resolution fantasy PvP overhaul, preserving menu-
 1. Combat baseline: complete cast-bar validation, consistent targeting and enemy cast feedback. Prove short/long/instant casts, interrupts, movement and repeated duels through existing authoritative scenarios and browser flows.
 2. Maps: authored stone-ruin arena and two-base forest CTF battleground, sharing a cohesive palette and licensed art. Visible cover must match server collision/LOS; walkable routes and flag objectives remain clear. Prove navigation, cover, both map loads and bot/objective play.
 3. Spell/readability pass: differentiated bolts/trails/impacts and Spellstorm, coherent combat UI, bounded effect counts and optional quality. Prove existing two-player and battleground flows, inspect real screenshots/client presentation. PvP balance, fun and low-end performance remain playtest/measurement outcomes.
-Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no rewrite or new infrastructure is justified. Current phase: 1; PR #11 has a browser failure after movement cancellation to investigate before integration.
+Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no rewrite or new infrastructure is justified. All three implementation slices are built; PRs #11 (cast bars), #12 (maps) and #13 (spell/HUD presentation) own CI, screenshot evidence and integration status. The cast flow waits for the server to acknowledge movement release before starting another cast; enemy cast progress uses public snapshots.
+
+## Spell readability — 2026-10-18
+- Arcanist projectiles use distinct elongated bright cores, warm trails and soft additive halos from one shared 64px procedural texture. Authoritative hit/crit events produce fading rings and ember streaks; Spellstorm has a larger layered gold activation cue. Visuals never schedule or decide damage.
+- Projectile visuals are capped at 96, impact groups at 64 and floating numbers at 32. Geometry/materials are reused where practical and expired meshes are disposed. No full-scene bloom pass was added to the shared-PC/browser budget.
+- Combat frames and hotbar share a bronze, stone and parchment palette; enemy cast progress is visible for interrupt timing. Original spell names and the existing menu entry remain. Q/E share a utility row below the cast bar; the default camera is angled lower to show character bodies.
+
+## Forest and arena (2026-10-18)
+- Riftwood Crossing has opposing Jade/Ember courtyards and three dirt routes. Rock clusters sit within visible gravel footprints matching the authoritative cover circles. Tall trees/camps stay outside the playable boundary; trees on the camera's side hide to keep combatants visible.
+- Shattered Court has a worn central floor, varied ruined walls, corner towers and existing cover pillars. Both maps retain their gameplay dimensions and server collision. The renderer selects art by authoritative map identity.
+- Selected unmodified Kenney Nature Kit CC0 models are vendored with their license, pinned official download and archive hash. Static terrain is batched by material; imported model containers are cached. Low-end rendering remains a measurement target.
+- PR #13 integrates the map work from #12 and spell/HUD presentation on merged cast-bar foundation #11; it owns final CI, screenshots and integration status.
 
 ## Cast bar — 2026-10-18
 - Flare Lance uses a 1.5-second base cast; Sunshard uses 4.5 seconds, or instant when its proc is consumed. Spellstorm halves these times. Cinder Dart remains the instant mobile attack.
@@ -34,8 +45,9 @@ Keep Rust/TypeScript/Babylon and the existing server-authoritative boundary; no 
 - Headless Chromium emitted unrequested large relative movements after button releases. The same native control assertions passed in desktop Chromium on Xvfb (run 39093928834); CI now runs the full suite in that environment. The cursor explicitly restores its drag anchor before becoming visible.
 
 ## Next slices
-1. Run CI, resolve correctness/browser regressions, inspect the recorded Arcanist art/flow.
-2. Validate Spellstorm expiry and repeated duels, then give Josh focused kit/bot/map playtest prompts.
+1. Playtest the Arcanist duel: short/long casts, instant payoff, interrupt readability, bolt visibility and bot difficulty.
+2. Playtest Riftwood Crossing routes, base recognition and cover in 6v6/10v10 practice; tune from observed problems.
+3. Measure Brave frame time and network latency before adding heavier rendering or enabling larger rosters.
 
 ## Known limits
 - Placeholder art, snapshot bandwidth, low-end GPU budgets and internet latency remain constraints. 20v20/40v40 stay disabled.

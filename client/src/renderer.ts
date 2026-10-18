@@ -1,3 +1,4 @@
+import { ForestMap } from "./forest-map";
 import { ArenaArt } from "./arena-art";
 import { CharacterModels, type CharacterVisual } from "./character-models";
 import { Engine } from "@babylonjs/core/Engines/engine";
@@ -36,6 +37,7 @@ export class ArenaRenderer {
   readonly camera: ArcRotateCamera;
   private models: CharacterModels;
   private arenaArt: ArenaArt;
+  private forestMap: ForestMap;
   private actors = new Map<number, Actor>();
   private areaMeshes = new Map<number, Mesh>();
   private materials = new Map<string, StandardMaterial>();
@@ -45,6 +47,7 @@ export class ArenaRenderer {
   private snapFocus = true;
   private ground: Mesh;
   private court: TransformNode | null = null;
+  private mapId = "shattered_court";
   private arena: Arena = initialContent.maps.shattered_court;
   private flagMeshes = new Map<number, TransformNode>();
   onPick: (id: number | null, point: Pos | null) => void = () => {};
@@ -65,6 +68,7 @@ export class ArenaRenderer {
     this.scene = new Scene(this.engine);
     this.models = new CharacterModels(this.scene);
     this.arenaArt = new ArenaArt(this.scene);
+    this.forestMap = new ForestMap(this.scene);
     this.scene.clearColor = new Color4(0.035, 0.065, 0.083, 1);
     this.scene.fogMode = Scene.FOGMODE_EXP2;
     this.scene.fogDensity = 0.012;
@@ -72,7 +76,7 @@ export class ArenaRenderer {
     this.camera = new ArcRotateCamera(
       "camera",
       -Math.PI / 2,
-      0.55,
+      0.85,
       39,
       new Vector3(0, 0, 0),
       this.scene,
@@ -236,6 +240,17 @@ export class ArenaRenderer {
   }
   private buildCourt(arena: Arena) {
     this.court?.dispose(false);
+    delete this.canvas.dataset.arenaArt;
+    if (this.mapId === "riftwood_crossing") {
+      this.ground.scaling.set(arena.half_x / 14000, 1, arena.half_z / 10000);
+      this.ground.material = this.material("#45513a");
+      this.scene.fogColor = Color3.FromHexString("#374c40");
+      this.scene.clearColor = new Color4(0.18, 0.25, 0.21, 1);
+      this.court = this.forestMap.build(arena);
+      return;
+    }
+    this.scene.fogColor = Color3.FromHexString("#303e42");
+    this.scene.clearColor = new Color4(0.10, 0.15, 0.18, 1);
     const existing = new Set(this.scene.meshes);
     const hx = arena.half_x / 1000;
     const hz = arena.half_z / 1000;
@@ -365,9 +380,10 @@ export class ArenaRenderer {
         console.warn("Arena art unavailable; using procedural fallback", error),
       );
   }
-  configure(content: Content) {
+  configure(content: Content, mapId: string) {
     this.content = content;
-    if (JSON.stringify(this.arena) !== JSON.stringify(content.arena)) {
+    if (this.mapId !== mapId || JSON.stringify(this.arena) !== JSON.stringify(content.arena)) {
+      this.mapId = mapId;
       this.arena = content.arena;
       this.buildCourt(this.arena);
     }
@@ -782,6 +798,7 @@ export class ArenaRenderer {
         0.15,
         this.cursor.z / 1000,
       );
+    if (this.mapId === "riftwood_crossing") this.forestMap.update(this.camera.alpha, this.camera.target);
     this.scene.render();
   }
 }
