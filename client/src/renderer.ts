@@ -798,6 +798,7 @@ export class ArenaRenderer {
         0.15,
         this.cursor.z / 1000,
       );
+    if (this.mapId === "riftwood_crossing") this.forestMap.update(this.camera.alpha, this.camera.target);
     this.scene.render();
   }
 }

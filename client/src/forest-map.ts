@@ -11,8 +11,18 @@ import type { Arena } from "./protocol";
 /** Authored forest CTF layout. Only protocol obstacles block movement and sight. */
 export class ForestMap {
   private assets = new Map<string, Promise<AssetContainer>>();
+  private trees: TransformNode[] = [];
   constructor(private scene: Scene) {}
+  update(alpha: number, focus: Readonly<{ x: number; z: number }>) {
+    const x = Math.cos(alpha), z = Math.sin(alpha);
+    for (const tree of this.trees) {
+      // Decorative trees on the camera's side of the field must not hide players.
+      const foreground = (tree.position.x - focus.x) * x + (tree.position.z - focus.z) * z > 0.5;
+      if (tree.isEnabled() === foreground) tree.setEnabled(!foreground);
+    }
+  }
   build(arena: Arena): TransformNode {
+    this.trees = [];
     const root = new TransformNode("riftwood-crossing", this.scene);
     const materials = new Map<string, StandardMaterial>();
     const mat = (color: string) => {
@@ -84,6 +94,7 @@ export class ForestMap {
     if (parent.isDisposed()) return;
     const place = (name: string, x: number, z: number, sx: number, sy = sx, sz = sx, rotation = 0, y = 0) => {
       const wrapper = new TransformNode(`forest-${name}`, this.scene); wrapper.parent = parent;
+      if (name.startsWith("tree_")) this.trees.push(wrapper);
       wrapper.position.set(x, y, z); wrapper.scaling.set(sx, sy, sz); wrapper.rotation.y = rotation;
       const instance = loaded.get(name)!.instantiateModelsToScene(n => `forest-${n}`);
       for (const root of instance.rootNodes) root.parent = wrapper;
