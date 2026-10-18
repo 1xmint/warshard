@@ -8,6 +8,7 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   let state: Snapshot | null = null,
     id = 0;
   let lastSteer: Extract<ClientMessage, { type: "steer" }> | null = null;
+  const observed: Snapshot[] = [];
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("websocket", (socket) =>
@@ -18,6 +19,10 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
         id = message.id;
       }
       if (message.type === "state") state = message.state;
+      if (message.type === "welcome" || message.type === "state") {
+        observed.push(message.state);
+        if (observed.length > 256) observed.shift();
+      }
       if (message.type === "error") errors.push(message.code);
     }),
   );
@@ -103,13 +108,15 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   expect(own().private!.charges.flashkindle.count).toBe(0);
   await page.screenshot({ path: info.outputPath("arcanist-ready.png") });
   await gcd();
+  const instantRound = state!.round, instantTick = state!.tick;
   await page.keyboard.press("Digit4");
+  // A legal instant shot may land between browser polls. Keep received snapshots
+  // and accept its authoritative impact as well as its in-flight representation.
   await expect
-    .poll(() =>
-      state!.projectiles.some(
-        (p) => p.owner === id && p.ability === "sunshard",
-      ),
-    )
+    .poll(() => observed.some((snapshot) => snapshot.round === instantRound && (
+      snapshot.projectiles.some((shot) => shot.owner === id && shot.ability === "sunshard" && shot.started >= instantTick) ||
+      snapshot.events.some((event) => event.source === id && event.ability === "sunshard" && event.tick >= instantTick && (event.kind === "hit" || event.kind === "crit"))
+    )))
     .toBe(true);
   await page.screenshot({ path: info.outputPath("arcanist-bolt.png") });
   expect(own().casting).toBeNull();
