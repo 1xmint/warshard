@@ -231,10 +231,12 @@ impl Content {
         for form in self.forms.values() {
             if form.duration > 72000
                 || form.activation.as_ref().is_some_and(|id| {
-                    self.abilities
-                        .get(id)
-                        .is_none_or(|a| a.cast != 0 || a.target == TargetKind::Ground)
-                        || form.duration == 0
+                    self.abilities.get(id).is_none_or(|a| {
+                        a.cast != 0
+                            || a.cost != 0
+                            || a.charges > 1
+                            || a.target == TargetKind::Ground
+                    }) || form.duration == 0
                 })
                 || form.abilities.len() != 5
                 || form
