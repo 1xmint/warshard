@@ -80,8 +80,12 @@ pub fn update(world: &mut World, sequences: &mut BTreeMap<u32, BotMemory>) {
             e.pos
         } else {
             // Flag runners use an outside lane to avoid the central melee.
-            let lane = if id.is_multiple_of(2) { 10500 } else { -10500 };
-            if objective_role && (objective.x - p.pos.x).abs() > 18000 && p.pos.z.abs() < 9000 {
+            let lane = if (id / 2).is_multiple_of(2) {
+                12000
+            } else {
+                -12000
+            };
+            if objective_role && (objective.x - p.pos.x).abs() > 18000 && p.pos.z.abs() < 11000 {
                 Pos {
                     x: p.pos.x,
                     z: lane,
@@ -181,21 +185,19 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                     state.match_info.flags[usize::from(1 - own.team)].pos
                 }
             });
-            let travelling = objective.is_some()
-                && (carrying
-                    || distance > 14000_i64.pow(2)
-                    || (objective_role && distance > 6500_i64.pow(2)));
+            let travelling =
+                objective.is_some() && (carrying || distance > 14000_i64.pow(2) || objective_role);
             let mut goal = if let Some(area) = danger {
                 away(area.pos)
             } else if travelling {
                 let destination = objective.unwrap();
                 // Both teams use both lanes rather than tying lane selection to team parity.
                 let lane = if (id / 2).is_multiple_of(2) {
-                    10500
+                    12000
                 } else {
-                    -10500
+                    -12000
                 };
-                if (destination.x - own.pos.x).abs() > 16000 && own.pos.z.abs() < 9000 {
+                if (destination.x - own.pos.x).abs() > 16000 && own.pos.z.abs() < 11000 {
                     Pos {
                         x: own.pos.x,
                         z: lane,
@@ -525,7 +527,15 @@ mod tests {
                 .count()
                 >= 6
         );
-        assert!(flag_moved, "objective roles never reached a flag");
+        assert!(
+            flag_moved,
+            "objective roles never reached a flag: {:?}",
+            world
+                .players
+                .values()
+                .map(|p| (p.view.id, p.view.pos, p.view.bot_action.clone()))
+                .collect::<Vec<_>>()
+        );
     }
     #[test]
     fn trained_bot_reacts_after_delay_without_private_opponent_information() {
