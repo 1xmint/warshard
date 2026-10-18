@@ -62,6 +62,11 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   expect(own().casting!.ends - own().casting!.started).toBe(90);
   await expect(page.locator("#cast-time")).toContainText("/ 4.5s");
   await expect(page.locator(".cast-wrap")).toBeVisible();
+  const castBounds = (await page.locator(".cast-bar").boundingBox())!;
+  for (const utility of ["#mobility", "#arcanist-barrier"]) {
+    const bounds = (await page.locator(utility).boundingBox())!;
+    expect(bounds.y).toBeGreaterThanOrEqual(castBounds.y + castBounds.height);
+  }
   await page.screenshot({ path: info.outputPath("arcanist-long-cast.png") });
   await page.keyboard.down("KeyD");
   await expect.poll(() => own().casting).toBeNull();

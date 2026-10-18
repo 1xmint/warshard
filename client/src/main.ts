@@ -87,6 +87,7 @@ document.body.insertAdjacentHTML(
   "beforeend",
   '<aside id="battle-map" class="battle-map hidden"></aside><section id="objectives" class="objective-hud hidden"><strong id="score"></strong><span id="match-clock"></span><div id="flag-status"></div></section><button id="mobility" class="mobility-button hidden">Q · Mobility</button>',
 );
+$("#utility-actions").append($("#mobility"));
 $("#mobility").onclick = () =>
   self()?.class_id === "arcanist"
     ? cast(5)

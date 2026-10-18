@@ -163,3 +163,26 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.hud .proc-banner {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  max-width: none;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+}
+.utility-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+#utility-actions #mobility, #utility-actions #arcanist-barrier {
+  position: static;
+  transform: none;
+  padding: 7px 12px;
+  min-width: 140px;
+  background: linear-gradient(#34372d, #171f21);
+  border: 1px solid #a28a5d;
+  color: #f4dfb7;
+  font-size: 11px;
+  border-radius: 3px;
+}
+.hud .cast-wrap { margin-right: 0; }
