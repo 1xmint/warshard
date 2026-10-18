@@ -63,35 +63,110 @@ async fn connection(mut socket: WebSocket, app: App) {
     else {
         return;
     };
-    let Ok(ClientMessage::Join {
-        version,
-        room,
-        class_id,
-        resume,
-    }) = serde_json::from_str(&text)
-    else {
+    let Ok(intro) = serde_json::from_str::<ClientMessage>(&text) else {
         error(&mut socket, "join_required", &app.metrics).await;
         return;
+    };
+    let (version, room, class_id, resume, assigned) = match intro {
+        ClientMessage::Join {
+            version,
+            room,
+            class_id,
+            resume,
+        } => (version, room, class_id, resume, None),
+        ClientMessage::Queue {
+            version,
+            playlist,
+            class_id,
+            practice,
+        } => {
+            if version != PROTOCOL {
+                error(&mut socket, "protocol_version", &app.metrics).await;
+                return;
+            }
+            if !app.content.classes.contains_key(&class_id) {
+                error(&mut socket, "unknown_class", &app.metrics).await;
+                return;
+            }
+            let (ticket, mut assignment, mut status) =
+                match crate::queue::QueuePool::enter(&app, &playlist, practice).await {
+                    Ok(ticket) => ticket,
+                    Err(code) => {
+                        error(&mut socket, code, &app.metrics).await;
+                        return;
+                    }
+                };
+            let initial = serde_json::to_string(&*status.borrow()).unwrap();
+            if !send(&mut socket, &initial, &app.metrics).await {
+                app.queue.lock().await.cancel(&ticket);
+                return;
+            }
+            let assigned = loop {
+                tokio::select! {
+                    biased;
+                    result=&mut assignment => { break result.ok(); },
+                    changed=status.changed() => {
+                        // A ticket's status sender is dropped during successful assignment.
+                        // Closed status is not a failed admission: consume its final handoff.
+                        if changed.is_err() { break assignment.await.ok(); }
+                        let message=serde_json::to_string(&*status.borrow_and_update()).unwrap();
+                        if !send(&mut socket,&message,&app.metrics).await {break None;}
+                    },
+                    message=socket.recv() => {
+                        if let Some(Ok(Message::Text(text)))=message && matches!(serde_json::from_str::<ClientMessage>(&text),Ok(ClientMessage::CancelQueue)) { send(&mut socket,&serde_json::to_string(&ServerMessage::Cancelled).unwrap(),&app.metrics).await; }
+                        break None;
+                    },
+                }
+            };
+            app.queue.lock().await.cancel(&ticket);
+            let Some(assigned) = assigned else {
+                return;
+            };
+            (
+                version,
+                assigned.room,
+                class_id,
+                None,
+                Some(assigned.handle),
+            )
+        }
+        _ => {
+            error(&mut socket, "join_required", &app.metrics).await;
+            return;
+        }
     };
     if version != PROTOCOL {
         error(&mut socket, "protocol_version", &app.metrics).await;
         return;
     }
-    if room.is_empty()
-        || room.len() > 32
-        || !room
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    if assigned.is_none() && room.starts_with("match-") && resume.is_none() {
+        error(&mut socket, "session_expired", &app.metrics).await;
+        return;
+    }
+    if assigned.is_none()
+        && !room.starts_with("match-")
+        && (room.is_empty()
+            || room.len() > 32
+            || !room
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
     {
         error(&mut socket, "invalid_room", &app.metrics).await;
         return;
     }
-    let handle = {
+    let handle = if let Some(handle) = assigned {
+        handle
+    } else {
         let mut rooms = app.rooms.lock().await;
         rooms.retain(|_, r| !r.tx.is_closed());
         if let Some(handle) = rooms.get(&room) {
             handle.clone()
         } else {
+            if room.starts_with("match-") {
+                drop(rooms);
+                error(&mut socket, "session_expired", &app.metrics).await;
+                return;
+            }
             if rooms.len() >= 64 {
                 drop(rooms);
                 error(&mut socket, "room_capacity", &app.metrics).await;
@@ -107,6 +182,8 @@ async fn connection(mut socket: WebSocket, app: App) {
                 states_tx,
                 app.content.clone(),
                 app.metrics.clone(),
+                None,
+                false,
             ));
             handle
         }
@@ -169,6 +246,7 @@ async fn connection(mut socket: WebSocket, app: App) {
                 match message {
                     Message::Text(text) => {
                         let Ok(message) = serde_json::from_str::<ClientMessage>(&text) else { error(&mut socket, "invalid_message", &app.metrics).await; break; };
+                        if matches!(message,ClientMessage::LeaveMatch) {let _=handle.tx.send(Command::Exit{id,generation}).await; break;}
                         let (reply, receive) = oneshot::channel();
                         if handle.tx.try_send(Command::Action { id, generation, message, reply }).is_err() { error(&mut socket, "server_busy", &app.metrics).await; break; }
                         match receive.await {

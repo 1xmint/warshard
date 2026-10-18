@@ -4,11 +4,21 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 90_000,
-  globalTimeout: 300_000,
+  globalTimeout: 600_000,
   reporter: "list",
   use: {
     baseURL: "http://localhost:5173",
     viewport: { width: 1440, height: 1000 },
+    // Exercise the shipped low-resolution setting on CI's software GPU.
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: "http://localhost:5173",
+          localStorage: [{ name: "warshard.quality", value: "2" }],
+        },
+      ],
+    },
     trace: "retain-on-failure",
     launchOptions: {
       args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],

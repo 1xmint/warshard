@@ -25,10 +25,14 @@ impl Arena {
     }
     pub fn move_step(&self, p: Pos, dx: i8, dz: i8, step: i32) -> Pos {
         let diagonal = dx != 0 && dz != 0;
-        let step = if diagonal { step * 707 / 1000 } else { step };
+        let scale = if diagonal { 707 } else { 1000 };
+        self.move_vector(p, i16::from(dx) * scale, i16::from(dz) * scale, step)
+    }
+    /// Direction uses thousandths of unit length; admission validates its magnitude.
+    pub fn move_vector(&self, p: Pos, dx: i16, dz: i16, step: i32) -> Pos {
         let mut next = p;
         let x = Pos {
-            x: p.x + i32::from(dx) * step,
+            x: p.x + i32::from(dx) * step / 1000,
             z: p.z,
         };
         if self.walkable(x) {
@@ -36,7 +40,7 @@ impl Arena {
         }
         let z = Pos {
             x: next.x,
-            z: p.z + i32::from(dz) * step,
+            z: p.z + i32::from(dz) * step / 1000,
         };
         if self.walkable(z) {
             next = z;

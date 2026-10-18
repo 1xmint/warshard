@@ -7,7 +7,6 @@ export function moveStep(
   step: number,
   arena: Arena,
 ): Pos {
-  if (dx && dz) step = Math.trunc((step * 707) / 1000);
   const walkable = (p: Pos) =>
     Math.abs(p.x) <= arena.half_x - 350 &&
     Math.abs(p.z) <= arena.half_z - 350 &&
@@ -16,9 +15,9 @@ export function moveStep(
         (p.x - o.pos.x) ** 2 + (p.z - o.pos.z) ** 2 > (o.radius + 350) ** 2,
     );
   let next = { ...pos };
-  const x = { x: pos.x + dx * step, z: pos.z };
+  const x = { x: pos.x + Math.trunc((dx * step) / 1000), z: pos.z };
   if (walkable(x)) next = x;
-  const z = { x: next.x, z: pos.z + dz * step };
+  const z = { x: next.x, z: pos.z + Math.trunc((dz * step) / 1000) };
   if (walkable(z)) next = z;
   return next;
 }
@@ -27,8 +26,10 @@ export class Prediction {
   seq = 0;
   pos: Pos = { x: 0, z: 0 };
   pending: Input[] = [];
-  reset(player: PlayerView) {
-    this.seq = player.private?.ack ?? 0;
+  reset(player: PlayerView, sameSession = false) {
+    // A round reset discards prediction, but queued inputs may be newer than
+    // the snapshot's acknowledgement. Never reuse their sequence numbers.
+    this.seq = Math.max(sameSession ? this.seq : 0, player.private?.ack ?? 0);
     this.pending = [];
     this.pos = { ...player.pos };
   }

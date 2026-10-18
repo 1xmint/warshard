@@ -25,7 +25,7 @@ function observe(page: Page) {
         record.content = message.content;
         record.welcomeCount++;
       } else if (message.type === "state") record.state = message.state;
-      else record.errors.push(message.code);
+      else if (message.type === "error") record.errors.push(message.code);
     }),
   );
   return record;
@@ -34,7 +34,7 @@ type RecordState = ReturnType<typeof observe>;
 const own = (r: RecordState) => r.state?.players.find((p) => p.id === r.id);
 const rival = (r: RecordState) => r.state?.players.find((p) => p.id !== r.id);
 async function join(page: Page, room: string, classId: string) {
-  await page.goto("/");
+  await page.goto("/?direct=1");
   await page.locator(`[data-class="${classId}"]`).click();
   await page.locator("#room").fill(room);
   await page.getByRole("button", { name: "ENTER ARENA" }).click();
@@ -49,6 +49,7 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
   });
+  await context.addInitScript(() => localStorage.setItem("warshard.quality", "2"));
   const a = await context.newPage();
   const b = await context.newPage();
   const runtimeErrors: string[] = [];
@@ -112,7 +113,10 @@ test("two real browser players: movement, targeting, interrupt, ground cast, for
   const oldId = rb.id;
   const oldTick = rb.state!.tick;
   await b.reload();
-  await expect(b.locator("#connection")).toHaveText("CONNECTED");
+  // Recovery includes a fresh WebGL context on CI's shared software GPU.
+  await expect(b.locator("#connection")).toHaveText("CONNECTED", {
+    timeout: 15000,
+  });
   await expect.poll(() => rb.welcomeCount).toBe(2);
   expect(rb.id).toBe(oldId);
   expect(own(rb)!.health).toBe(oldHealth);
@@ -205,7 +209,7 @@ test("protocol rejects wrong versions and malformed admission", async ({
       }),
       await request({
         type: "join",
-        version: 1,
+        version: 4,
         room: "../bad",
         class_id: "briarwarden",
         resume: null,

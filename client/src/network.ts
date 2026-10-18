@@ -11,6 +11,7 @@ export class Connection {
   content: Content | null = null;
   state: Snapshot | null = null;
   private room = "";
+  private pending: { playlist: string; practice: boolean } | null = null;
   private classId = "";
   private stopped = true;
   private attempts = 0;
@@ -18,9 +19,28 @@ export class Connection {
   onState: (state: Snapshot, welcome: boolean) => void = () => {};
   onStatus: (status: string) => void = () => {};
   onError: (code: string) => void = () => {};
+  onQueue: (playlist: string, waiting: number, needed: number) => void =
+    () => {};
+
+  queue(playlist: string, classId: string, practice: boolean) {
+    this.close();
+    this.room = "";
+    this.classId = classId;
+    this.pending = { playlist, practice };
+    this.stopped = false;
+    this.attempts = 0;
+    sessionStorage.removeItem("warshard.join");
+    this.open();
+  }
+  cancelQueue() {
+    this.send({ type: "cancel_queue" });
+    this.close();
+    this.pending = null;
+  }
 
   join(room: string, classId: string) {
     this.close();
+    this.pending = null;
     this.room = room;
     this.classId = classId;
     this.stopped = false;
@@ -37,14 +57,23 @@ export class Connection {
     this.socket = socket;
     let admitted = false;
     socket.onopen = () =>
-      this.send({
-        type: "join",
-        version: 1,
-        room: this.room,
-        class_id: this.classId,
-        resume: sessionStorage.getItem(`warshard.token.${this.room}`),
-      });
+      this.pending
+        ? this.send({
+            type: "queue",
+            version: 4,
+            playlist: this.pending.playlist,
+            class_id: this.classId,
+            practice: this.pending.practice,
+          })
+        : this.send({
+            type: "join",
+            version: 4,
+            room: this.room,
+            class_id: this.classId,
+            resume: sessionStorage.getItem(`warshard.token.${this.room}`),
+          });
     socket.onmessage = (event) => {
+      if (this.socket !== socket || this.stopped) return;
       let message: ServerMessage;
       try {
         message = JSON.parse(String(event.data)) as ServerMessage;
@@ -54,12 +83,18 @@ export class Connection {
         return;
       }
       if (message.type === "welcome") {
-        if (message.version !== 1) {
+        if (message.version !== 4) {
           this.onError("protocol_version");
           this.close();
           return;
         }
         admitted = true;
+        this.room = message.room;
+        this.pending = null;
+        sessionStorage.setItem(
+          "warshard.join",
+          JSON.stringify({ room: this.room, classId: this.classId }),
+        );
         this.attempts = 0;
         this.id = message.id;
         this.content = message.content;
@@ -70,10 +105,18 @@ export class Connection {
       } else if (message.type === "state") {
         this.state = message.state;
         this.onState(message.state, false);
+      } else if (message.type === "queued") {
+        this.onStatus("QUEUED");
+        this.onQueue(message.playlist, message.waiting, message.needed);
+      } else if (message.type === "cancelled") {
+        this.close();
       } else {
         this.onError(message.code);
         if (!admitted) {
-          if (message.code === "session_expired") {
+          if (
+            message.code === "session_expired" &&
+            !this.room.startsWith("match-")
+          ) {
             sessionStorage.removeItem(`warshard.token.${this.room}`);
             socket.close();
           } else {

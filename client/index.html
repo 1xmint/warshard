@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#101b21" />
-    <title>Warshard — The Shattered Court</title>
+    <title>Warshard — Battlegrounds</title>
   </head>
   <body>
     <canvas id="arena" aria-label="Warshard arena"></canvas>
@@ -58,9 +58,9 @@
       <p id="phase-detail"></p>
     </div>
     <aside class="session hidden" id="session">
-      <span class="eyebrow">ARENA CHANNEL</span>
+      <span class="eyebrow">MATCH</span>
       <div><i></i><span id="room-label"></span></div>
-      <small id="round-label"></small><button id="leave">Leave arena</button>
+      <small id="round-label"></small><button id="leave">Leave match</button>
     </aside>
     <aside class="chronicle hidden" id="chronicle">
       <span class="eyebrow">COMBAT CHRONICLE</span>
@@ -91,14 +91,15 @@
     <div class="vignette"></div>
     <main id="lobby">
       <div class="lobby-mark">◇</div>
-      <span class="eyebrow">ENTER THE SHATTERED COURT</span>
+      <span class="eyebrow">CHOOSE YOUR CALLING</span>
       <h1>Claim your shard.</h1>
       <p class="intro">
-        Steel meets spell. Two rivals. One living battlefield.<br />Choose your
+        Steel meets spell. Carry your colors. Hold your ground.<br />Choose your
         calling and step into the arena.
       </p>
       <form id="join-form">
         <div class="class-grid">
+          <button type="button" class="class-card arcanist-card" data-class="arcanist" aria-pressed="false"><small>RANGED · REACTIVE BURST</small><strong>☀</strong><h2>Arcanist</h2><p>Kindle a critical chain.<br>Unleash an instant Sunshard.</p><span>CHOOSE HERO →</span></button>
           <button
             type="button"
             class="class-card selected"
@@ -139,7 +140,7 @@
         <p id="lobby-error" role="alert"></p>
       </form>
       <p class="lobby-foot">
-        FIRST PLAYABLE · ORIGINAL PROCEDURAL ART · SERVER-AUTHORITATIVE
+        FIRST PLAYABLE · LICENSED CC0 ART · SERVER-AUTHORITATIVE
       </p>
     </main>
     <dialog id="help">
@@ -147,7 +148,8 @@
       ><span class="eyebrow">FIELD GUIDE</span>
       <h2>Knowledge is your advantage.</h2>
       <p>
-        WASD moves. Tab cycles living enemies; click a character to select it.
+        WASD moves relative to facing. Left-drag looks around; right-drag turns your character; both mouse buttons run forward. Scroll to zoom. Tab cycles living enemies; click a character to select it.
+        The first right-click captures the mouse for play. A game cursor appears between drags; Escape releases the mouse to the browser. Right-click again to resume capture.
         Keys 1–5 activate the current kit. Hover an ability for its range, cast
         time and effect.
       </p>
@@ -158,12 +160,15 @@
       </p>
       <p>
         Build energy through combat. At 100%, press R for a 12-second
-        transformation and five alternate abilities. Shields absorb damage;
+        transformation. Arcanist's Spellstorm speeds up casts and primes Sunshard;
+        other heroes gain alternate abilities. Shields absorb damage;
         interrupts cancel casts and briefly lock their school.
       </p>
       <p>
-        Use two browser tabs in the same arena channel to duel. A round ends on
-        defeat and restarts automatically. There is no audio in this slice.
+        Choose Arcanist duel for a solo practice opponent. Duel Lab changes
+        difficulty, restarts the fight and controls sound. Flashkindle guarantees
+        critical hits: two critical hits prepare an instant Sunshard.
+        A round ends on defeat; choose Fight again to restart.
       </p>
     </dialog>
     <script type="module" src="/src/main.ts"></script>

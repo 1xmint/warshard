@@ -1,3 +1,5 @@
+import { ArenaArt } from "./arena-art";
+import { CharacterModels, type CharacterVisual } from "./character-models";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
@@ -25,20 +27,26 @@ type Actor = {
   lastPos: Vector3;
   health: number;
   flash: number;
+  visual: CharacterVisual | null;
+  labelHtml: string;
 };
 export class ArenaRenderer {
   readonly engine: Engine;
   readonly scene: Scene;
   readonly camera: ArcRotateCamera;
+  private models: CharacterModels;
+  private arenaArt: ArenaArt;
   private actors = new Map<number, Actor>();
   private areaMeshes = new Map<number, Mesh>();
   private materials = new Map<string, StandardMaterial>();
   private placement: Mesh;
   private content: Content | null = null;
   private frames: { state: Snapshot; at: number }[] = [];
+  private snapFocus = true;
   private ground: Mesh;
   private court: TransformNode | null = null;
-  private arena: Arena = initialContent.arena;
+  private arena: Arena = initialContent.maps.shattered_court;
+  private flagMeshes = new Map<number, TransformNode>();
   onPick: (id: number | null, point: Pos | null) => void = () => {};
   cursor: Pos | null = null;
 
@@ -48,8 +56,15 @@ export class ArenaRenderer {
       stencil: true,
       preserveDrawingBuffer: false,
     });
-    this.engine.setHardwareScalingLevel(Math.max(1, devicePixelRatio / 1.5));
+    const quality = Number(localStorage.getItem("warshard.quality"));
+    this.engine.setHardwareScalingLevel(
+      [1, 1.5, 2].includes(quality)
+        ? quality
+        : Math.max(1, devicePixelRatio / 1.5),
+    );
     this.scene = new Scene(this.engine);
+    this.models = new CharacterModels(this.scene);
+    this.arenaArt = new ArenaArt(this.scene);
     this.scene.clearColor = new Color4(0.035, 0.065, 0.083, 1);
     this.scene.fogMode = Scene.FOGMODE_EXP2;
     this.scene.fogDensity = 0.012;
@@ -85,48 +100,66 @@ export class ArenaRenderer {
     this.placement = this.ring("placement", 5.4, "#e7c783");
     this.placement.position.y = 0.04;
     this.placement.setEnabled(false);
-    canvas.addEventListener("pointermove", (event) => {
-      const rect = canvas.getBoundingClientRect();
-      const pick = this.scene.pick(
-        event.clientX - rect.left,
-        event.clientY - rect.top,
-        (m) => m === this.ground,
-      );
-      this.cursor = pick?.pickedPoint
-        ? {
-            x: Math.round(pick.pickedPoint.x * 1000),
-            z: Math.round(pick.pickedPoint.z * 1000),
-          }
-        : null;
-    });
-    canvas.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      const pick = this.scene.pick(
-        x,
-        y,
-        (m) => m === this.ground || typeof m.metadata?.playerId === "number",
-      );
-      let id: number | null = null;
-      if (typeof pick?.pickedMesh?.metadata?.playerId === "number")
-        id = pick.pickedMesh.metadata.playerId as number;
-      const floor = this.scene.pick(x, y, (m) => m === this.ground);
-      const point = floor?.pickedPoint
-        ? {
-            x: Math.round(floor.pickedPoint.x * 1000),
-            z: Math.round(floor.pickedPoint.z * 1000),
-          }
-        : null;
-      this.onPick(id, point);
-    });
     window.addEventListener("resize", () => this.resize());
     this.resize();
   }
+  pointAt(clientX: number, clientY: number) {
+    this.scene.updateTransformMatrix();
+    const rect = this.canvas.getBoundingClientRect();
+    const pick = this.scene.pick(
+      clientX - rect.left,
+      clientY - rect.top,
+      (m) => m === this.ground,
+    );
+    this.cursor = pick?.pickedPoint
+      ? {
+          x: Math.round(pick.pickedPoint.x * 1000),
+          z: Math.round(pick.pickedPoint.z * 1000),
+        }
+      : null;
+  }
+  pickAt(clientX: number, clientY: number) {
+    this.scene.updateTransformMatrix();
+    const rect = this.canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const pick = this.scene.pick(
+      x,
+      y,
+      (m) => m === this.ground || typeof m.metadata?.playerId === "number",
+    );
+    let id: number | null = null;
+    if (typeof pick?.pickedMesh?.metadata?.playerId === "number")
+      id = pick.pickedMesh.metadata.playerId as number;
+    const floor = this.scene.pick(x, y, (m) => m === this.ground);
+    const point = floor?.pickedPoint
+      ? {
+          x: Math.round(floor.pickedPoint.x * 1000),
+          z: Math.round(floor.pickedPoint.z * 1000),
+        }
+      : null;
+    this.onPick(id, point);
+  }
+  project(pos: Pos, height = 2.5) {
+    const screen = Vector3.Project(
+      new Vector3(pos.x / 1000, height, pos.z / 1000),
+      Matrix.IdentityReadOnly,
+      this.scene.getTransformMatrix(),
+      this.camera.viewport.toGlobal(
+        this.engine.getRenderWidth(),
+        this.engine.getRenderHeight(),
+      ),
+    );
+    return {
+      x: (screen.x * this.canvas.clientWidth) / this.engine.getRenderWidth(),
+      y: (screen.y * this.canvas.clientHeight) / this.engine.getRenderHeight(),
+    };
+  }
+  cue(id: number, melee: boolean) {
+    this.actors.get(id)?.visual?.cue(melee);
+  }
   private resize() {
     this.engine.resize();
-    this.camera.radius = innerWidth / innerHeight < 1.3 ? 48 : 39;
   }
   private material(color: string, glow = false, alpha = 1) {
     const key = `${color}/${glow}/${alpha}`;
@@ -218,7 +251,7 @@ export class ArenaRenderer {
           x,
           -0.055 + n * 0.002,
           z,
-          ["#354548", "#3b4c4c", "#304144", "#3a4948", "#34484a"][n],
+          ["#404b5f", "#485468", "#354258", "#3d4a60", "#455368"][n],
         );
       }
     this.cylinder("central-dais", 7.5, 0.12, 0, 0.03, 0, "#405152");
@@ -271,6 +304,7 @@ export class ArenaRenderer {
       r.position.set(spawn.x / 1000, 0.02, spawn.z / 1000);
     }
     for (const obstacle of arena.obstacles) {
+      const before = this.scene.meshes.length;
       const x = obstacle.pos.x / 1000;
       const z = obstacle.pos.z / 1000;
       const diameter = (obstacle.radius * 2) / 1000;
@@ -296,11 +330,40 @@ export class ArenaRenderer {
       crystal.scaling.y = 1.8;
       crystal.material = this.material("#98c6b6", true);
       crystal.isPickable = false;
+      if (arena.half_x === 14000)
+        for (const mesh of this.scene.meshes.slice(before))
+          mesh.metadata = { arenaPlaceholder: true };
     }
-    this.box("underworld", 90, 0.1, 90, 0, -1.1, 0, "#0d2029");
+    this.box("underworld", 90, 0.1, 90, 0, -1.5, 0, "#0d1729");
+    // Static stonework shares materials: merge it once instead of drawing each tile.
+    const batches = new Map<StandardMaterial, Mesh[]>();
+    for (const mesh of this.scene.meshes) {
+      if (
+        !existing.has(mesh) &&
+        !mesh.metadata?.arenaPlaceholder &&
+        mesh instanceof Mesh &&
+        mesh.material instanceof StandardMaterial
+      ) {
+        mesh.computeWorldMatrix(true);
+        const group = batches.get(mesh.material) ?? [];
+        group.push(mesh);
+        batches.set(mesh.material, group);
+      }
+    }
+    for (const group of batches.values()) {
+      if (group.length > 1) {
+        const merged = Mesh.MergeMeshes(group, true, true);
+        if (merged) merged.isPickable = false;
+      }
+    }
     this.court = new TransformNode("court", this.scene);
     for (const mesh of this.scene.meshes)
       if (!existing.has(mesh)) mesh.parent = this.court;
+    void this.arenaArt
+      .decorate(this.court, arena)
+      .catch((error) =>
+        console.warn("Arena art unavailable; using procedural fallback", error),
+      );
   }
   configure(content: Content) {
     this.content = content;
@@ -308,11 +371,15 @@ export class ArenaRenderer {
       this.arena = content.arena;
       this.buildCourt(this.arena);
     }
+    for (const flag of this.flagMeshes.values()) flag.dispose(false);
+    this.flagMeshes.clear();
   }
   receive(state: Snapshot, reset: boolean) {
     if (reset) {
+      this.snapFocus = true;
       this.frames = [];
       for (const actor of this.actors.values()) {
+        actor.visual?.dispose();
         actor.root.dispose(false);
         actor.label.remove();
       }
@@ -486,15 +553,83 @@ export class ArenaRenderer {
       lastPos: new Vector3(),
       health: player.health,
       flash: 0,
+      visual: null as CharacterVisual | null,
+      labelHtml: "",
     };
+    void this.models
+      .attach(root, player.id, melee)
+      .then((visual) => {
+        if (!visual) return;
+        actor.visual = visual;
+        body.setEnabled(false);
+        label.dataset.model = "kaykit";
+      })
+      .catch((error) => {
+        label.dataset.model = "fallback";
+        console.warn(
+          "Character model unavailable; using procedural fallback",
+          error,
+        );
+      });
     root.position.set(player.pos.x / 1000, 0, player.pos.z / 1000);
     this.actors.set(player.id, actor);
     return actor;
   }
-  render(localId: number, predicted: Pos | null, target: number | null) {
+  render(
+    localId: number,
+    predicted: Pos | null,
+    target: number | null,
+    facing: number,
+  ) {
     const latest = this.frames.at(-1)?.state;
     const now = performance.now();
     if (latest && this.content) {
+      const local = latest.players.find((p) => p.id === localId);
+      if (local) {
+        const focus = predicted ?? local.pos;
+        const follow = this.snapFocus ? 1 : 0.15;
+        this.camera.target.x += (focus.x / 1000 - this.camera.target.x) * follow;
+        this.camera.target.z += (focus.z / 1000 - this.camera.target.z) * follow;
+        this.snapFocus = false;
+      }
+      // Labels and picking must use this frame's orbit/follow transform.
+      this.scene.updateTransformMatrix();
+      for (const flag of latest.match_info.flags) {
+        let root = this.flagMeshes.get(flag.team);
+        if (!root) {
+          root = new TransformNode(`flag-${flag.team}`, this.scene);
+          this.cylinder("flagpole", 0.08, 3, 0, 1.5, 0, "#ddcfab", root);
+          const banner = this.box(
+            "team-standard",
+            1.1,
+            0.85,
+            0.07,
+            0.52,
+            2.45,
+            0,
+            flag.team === 0 ? "#55bca3" : "#d18d6e",
+            root,
+          );
+          banner.material = this.material(
+            flag.team === 0 ? "#55bca3" : "#d18d6e",
+            true,
+          );
+          const marker = this.ring(
+            "flag-marker",
+            1.6,
+            flag.team === 0 ? "#55bca3" : "#d18d6e",
+            0.08,
+          );
+          marker.parent = root;
+          marker.position.y = 0.15;
+          this.flagMeshes.set(flag.team, root);
+        }
+        root.position.set(
+          flag.pos.x / 1000,
+          flag.carrier !== null ? 0.6 : 0,
+          flag.pos.z / 1000,
+        );
+      }
       const at = now - 100;
       const before = this.frames.findLast((f) => f.at <= at) ?? this.frames[0];
       const after = this.frames.find((f) => f.at > at) ?? this.frames.at(-1)!;
@@ -517,21 +652,14 @@ export class ArenaRenderer {
           (pos.z / 1000 - actor.root.position.z) * (p.id === localId ? 0.5 : 1);
         const moved =
           Vector3.DistanceSquared(actor.root.position, actor.lastPos) > 0.00001;
-        if (moved)
-          actor.root.rotation.y = Math.atan2(
-            -(actor.root.position.x - actor.lastPos.x),
-            -(actor.root.position.z - actor.lastPos.z),
-          );
-        else if (p.casting && target !== null) {
-          const t = latest.players.find(
-            (q) => q.id === (p.id === localId ? target : localId),
-          );
-          if (t)
-            actor.root.rotation.y = Math.atan2(
-              -(t.pos.x - p.pos.x),
-              -(t.pos.z - p.pos.z),
-            );
-        }
+        actor.visual?.update(
+          moved,
+          !!p.casting,
+          p.health <= 0,
+          p.form_until > latest.tick,
+        );
+        actor.root.rotation.y =
+          (p.id === localId ? facing : p.facing / 1000) + Math.PI;
         actor.body.position.y = moved
           ? Math.sin(now / 85) * 0.045
           : Math.sin(now / 600 + p.id) * 0.025;
@@ -576,10 +704,18 @@ export class ArenaRenderer {
           p.team !== latest.players.find((q) => q.id === localId)?.team,
         );
         const name = this.content.classes[p.class_id].name;
-        actor.label.innerHTML = `${name}${p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%"></i></span>${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
+        const carrying = latest.match_info.flags.some(
+          (f) => f.carrier === p.id,
+        );
+        const labelHtml = `${name} #${p.id}${p.bot ? " [BOT]" : p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%;background:${p.team === 0 ? "#6ad9bb" : "#e49b73"}"></i></span>${carrying ? '<b class="flag-carrier">⚑ FLAG CARRIER</b>' : ""}${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
+        if (actor.labelHtml !== labelHtml) {
+          actor.label.innerHTML = labelHtml;
+          actor.labelHtml = labelHtml;
+        }
       }
       for (const [id, actor] of this.actors)
         if (!latest.players.some((p) => p.id === id)) {
+          actor.visual?.dispose();
           actor.root.dispose(false);
           actor.label.remove();
           this.actors.delete(id);
