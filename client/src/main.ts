@@ -413,7 +413,7 @@ function updateHud() {
   const tick = state.tick;
   const info = content.classes[p.class_id];
   if (status === "CONNECTED") updateObjectives(state, content, net.id);
-  $("#self-name").textContent = info.name;
+  $("#self-name").textContent = `${info.name} · ${p.team === 0 ? "JADE" : "EMBER"}`;
   $("#self-health").style.width = `${(p.health / p.max_health) * 100}%`;
   $("#self-hp").textContent =
     `${p.health} / ${p.max_health}${p.shield ? ` + ${p.shield}` : ""}`;
@@ -431,7 +431,7 @@ function updateHud() {
   const enemy = state.players.find((t) => t.id === selectedTarget);
   $("#target-frame").classList.toggle("hidden", !enemy);
   if (enemy) {
-    $("#target-name").textContent = content.classes[enemy.class_id].name;
+    $("#target-name").textContent = `${content.classes[enemy.class_id].name} · ${enemy.team === 0 ? "JADE" : "EMBER"}`;
     $("#target-health").style.width =
       `${(enemy.health / enemy.max_health) * 100}%`;
     $("#target-hp").textContent =
@@ -502,7 +502,7 @@ function updateHud() {
       button.title = tooltip(ability);
       button.dataset.slot = String(slot);
       button.setAttribute("aria-label", `${slot + 1}: ${ability.name}`);
-      button.innerHTML = `<span class="key">${slot + 1}</span><span class="ability-icon">${spellIcon(ability.icon)}</span><span class="ability-name">${ability.name}</span><span class="cooldown-shade"></span><span class="cooldown-label"></span><span class="charge-count"></span>`;
+      button.innerHTML = `<span class="key">${slot + 1}</span><span class="ability-icon">${spellIcon(ability.icon)}</span><span class="ability-name">${ability.name}</span><span class="gcd-shade"></span><span class="cooldown-shade"></span><span class="cooldown-label"></span><span class="charge-count"></span>`;
       button.onclick = () => cast(slot);
       $("#abilities").append(button);
     });
@@ -522,10 +522,12 @@ function updateHud() {
       a.charges > 1 && p.private.charges[id]?.count === 0
         ? p.private.charges[id].next_at - tick
         : 0,
-      a.effects.some((effect) => effect.kind === "blink")
-        ? 0
-        : p.private.gcd_until - tick,
     );
+    const gcdLeft = a.effects.some((effect) => effect.kind === "blink")
+      ? 0 : Math.max(0, p.private.gcd_until - tick);
+    button.classList.toggle("global-cooldown", gcdLeft > 0);
+    (button.querySelector(".gcd-shade") as HTMLElement).style.transform =
+      `scaleY(${Math.min(1, gcdLeft / Math.max(1, a.gcd))})`;
     button.classList.toggle("counting-down", left > 0);
     button.querySelector(".cooldown-label")!.textContent =
       left > 0
@@ -537,7 +539,7 @@ function updateHud() {
         : "";
     button.classList.toggle(
       "unavailable",
-      left > 0 || p.private.resource < a.cost || !active(),
+      left > 0 || gcdLeft > 0 || p.private.resource < a.cost || !active(),
     );
     button.classList.toggle("placing", placement === slot);
     button.classList.toggle(

@@ -47,7 +47,14 @@ impl Arena {
         }
         next
     }
+    /// Navigation tests the whole body, while spells test the unexpanded cover.
+    pub fn path_clear(&self, a: Pos, b: Pos) -> bool {
+        self.walkable(a) && self.walkable(b) && self.segment_clear(a, b, 350)
+    }
     pub fn line_of_sight(&self, a: Pos, b: Pos) -> bool {
+        self.segment_clear(a, b, 0)
+    }
+    fn segment_clear(&self, a: Pos, b: Pos, clearance: i32) -> bool {
         self.obstacles.iter().all(|o| {
             let dx = f64::from(b.x - a.x);
             let dz = f64::from(b.z - a.z);
@@ -60,7 +67,7 @@ impl Arena {
             };
             let x = f64::from(a.x) + t * dx - f64::from(o.pos.x);
             let z = f64::from(a.z) + t * dz - f64::from(o.pos.z);
-            x * x + z * z > f64::from(o.radius).powi(2)
+            x * x + z * z > f64::from(o.radius + clearance).powi(2)
         })
     }
 }

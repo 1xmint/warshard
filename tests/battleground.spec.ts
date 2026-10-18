@@ -64,6 +64,9 @@ test("menus, human queue cancellation, CTF practice, movement and recovery", asy
   await expect(page.locator("#arena")).toHaveAttribute("data-arena-art", "kenney-forest", { timeout: 15000 });
   expect(record.state!.players).toHaveLength(12);
   expect(record.state!.players.filter((p) => p.bot)).toHaveLength(11);
+  expect(record.state!.match_info.bot_difficulty).toBe("trained");
+  expect(record.state!.players.some((player) => player.bot && player.class_id === "arcanist")).toBe(true);
+
   await expect(page.locator("#flag-status")).toContainText("Jade flag:");
   const before = record.state!.players.find((p) => p.id === record.id)!.pos.x;
   await page.keyboard.down("KeyD");
@@ -73,6 +76,7 @@ test("menus, human queue cancellation, CTF practice, movement and recovery", asy
   await page.keyboard.up("KeyD");
   await page.keyboard.press("Tab");
   await expect(page.locator("#target-frame")).toBeVisible();
+  await expect.poll(() => Object.values(record.state!.match_info.stats).some((stats) => stats.bot && stats.damage > 0), { timeout: 20000 }).toBe(true);
   const id = record.id;
   await page.reload();
   await expect.poll(() => record.welcomes).toBe(2);

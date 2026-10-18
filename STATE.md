@@ -1,5 +1,8 @@
 # Warshard state
 
+## Bot combat and hotbar follow-up (2026-10-18)
+Clearance-aware routing now handles valid destinations beside blocked grid centers and validates every route segment. Trained bots retain CTF flag roles, prefer exposed targets, spread away from nearby allies and check their own cooldowns before interrupts/defenses. Normal practice uses trained opponents and Arcanist caster slots; the selectable Easy duel remains. Mage priority: instant Sunshard, Flashkindle to complete Kindling, stationary Flare Lance, mobile Cinder Dart. Team badges/rings identify every combatant; GCD uses a shrinking shadow while numbers show personal cooldowns only. CI owns navigation, sustained rotation, 12-bot objective and browser proof; scoped builds run locally.
+
 ## PvP experience roadmap — 2026-10-18
 Josh authorized a cohesive low-resolution fantasy PvP overhaul, preserving menu-to-match entry and exactly two maps. The identity/assets remain original or licensed; WoW is a controls/readability/pacing reference, not a map or asset source. No accounts, progression or new modes in this pass.
 1. Combat baseline: complete cast-bar validation, consistent targeting and enemy cast feedback. Prove short/long/instant casts, interrupts, movement and repeated duels through existing authoritative scenarios and browser flows.

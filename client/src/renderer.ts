@@ -692,16 +692,16 @@ export class ArenaRenderer {
         actor.aura.position.y = 0.12 + Math.sin(now / 350) * 0.06;
         actor.root.scaling.setAll(transformed ? 1.22 : 1);
         actor.shield.setEnabled(p.shield > 0);
-        actor.ring.setEnabled(p.id === target || p.id === localId);
+        actor.ring.setEnabled(p.health > 0);
         actor.ring.material = this.material(
-          p.id === target ? "#dfa288" : "#6dbaa4",
+          p.id === target ? "#ffdf8d" : p.team === 0 ? "#50efc3" : "#ff775c",
           true,
         );
         if (p.health < actor.health) actor.flash = now + 220;
         actor.health = p.health;
         actor.body.scaling.y = p.health <= 0 ? 0.35 : 1;
         actor.shield.visibility = p.shield > 0 ? 1 : 0;
-        actor.ring.scaling.setAll(now < actor.flash ? 1.35 : 1);
+        actor.ring.scaling.setAll(now < actor.flash ? 1.35 : p.id === target ? 1.2 : 1);
         const screen = Vector3.Project(
           actor.root.position.add(new Vector3(0, transformed ? 3.3 : 2.7, 0)),
           Matrix.Identity(),
@@ -719,11 +719,14 @@ export class ArenaRenderer {
           "enemy",
           p.team !== latest.players.find((q) => q.id === localId)?.team,
         );
+        actor.label.dataset.team = String(p.team);
+        const ally = p.team === latest.players.find((q) => q.id === localId)?.team;
+        const badge = `${p.team === 0 ? "◆ JADE" : "▲ EMBER"} · ${p.id === localId ? "YOU" : ally ? "ALLY" : "ENEMY"}`;
         const name = this.content.classes[p.class_id].name;
         const carrying = latest.match_info.flags.some(
           (f) => f.carrier === p.id,
         );
-        const labelHtml = `${name} #${p.id}${p.bot ? " [BOT]" : p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%;background:${p.team === 0 ? "#6ad9bb" : "#e49b73"}"></i></span>${carrying ? '<b class="flag-carrier">⚑ FLAG CARRIER</b>' : ""}${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
+        const labelHtml = `<span class="team-tag">${badge}</span>${name} #${p.id}${p.bot ? " [BOT]" : p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%;background:${p.team === 0 ? "#6ad9bb" : "#e49b73"}"></i></span>${carrying ? '<b class="flag-carrier">⚑ FLAG CARRIER</b>' : ""}${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
         if (actor.labelHtml !== labelHtml) {
           actor.label.innerHTML = labelHtml;
           actor.labelHtml = labelHtml;

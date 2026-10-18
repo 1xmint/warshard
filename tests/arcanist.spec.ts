@@ -101,11 +101,19 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   await page.keyboard.press("Tab");
   await page.keyboard.press("Digit3");
   await expect(page.locator("#proc-banner")).toContainText("KINDLING");
+  // GCD darkens a ready spell without inventing a personal cooldown number.
+  await expect(page.locator('[data-slot="0"] .cooldown-label')).toHaveText("");
+  await expect(page.locator('[data-slot="0"]')).toHaveClass(/global-cooldown/);
+
   await gcd();
   await page.keyboard.press("Digit3");
   await expect(page.locator("#proc-banner")).toContainText("SUNSHARD READY");
   await expect(page.locator('[data-slot="3"]')).toHaveClass(/proc-ready/);
   expect(own().private!.charges.flashkindle.count).toBe(0);
+  await expect(page.locator('[data-slot="2"] .cooldown-label')).not.toHaveText("");
+  await expect(page.locator('.actor-label[data-team="0"] .team-tag')).toContainText("JADE");
+  await expect(page.locator('.actor-label[data-team="1"] .team-tag')).toContainText("EMBER");
+
   await page.screenshot({ path: info.outputPath("arcanist-ready.png") });
   await gcd();
   const instantRound = state!.round, instantTick = state!.tick;
