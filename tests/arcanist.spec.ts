@@ -73,7 +73,8 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   const remaining = await secondsLeft();
   await expect.poll(secondsLeft).toBeLessThan(remaining);
   const castBounds = (await page.locator(".cast-bar").boundingBox())!;
-  for (const utility of ["#mobility", "#arcanist-barrier"]) {
+  await expect(page.locator("button.ability")).toHaveCount(9);
+  for (const utility of ['[data-slot="5"]', '[data-slot="6"]', '[data-slot="7"]', '[data-slot="8"]']) {
     const bounds = (await page.locator(utility).boundingBox())!;
     expect(bounds.y).toBeGreaterThanOrEqual(castBounds.y + castBounds.height);
   }
@@ -81,6 +82,17 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   await page.keyboard.down("KeyD");
   await expect.poll(() => own().casting).toBeNull();
   await page.keyboard.up("KeyD");
+  await expect.poll(() => lastSteer !== null && lastSteer.dx === 0 && lastSteer.dz === 0).toBe(true);
+  await expect.poll(() => own().private!.ack).toBeGreaterThanOrEqual(lastSteer!.seq);
+  await gcd();
+  const mobileRound = state!.round, mobileTick = state!.tick, mobileOrigin = { ...own().pos };
+  await page.keyboard.down("KeyD");
+  await page.keyboard.press("Digit1");
+  await page.keyboard.press("KeyQ");
+  await expect.poll(() => observed.some((snapshot) => snapshot.round === mobileRound && snapshot.tick >= mobileTick && snapshot.players.some((p) => p.id === id && p.casting?.ability === "cinder_dart" && p.shield > 0))).toBe(true);
+  await expect.poll(() => Math.abs(own().pos.x - mobileOrigin.x) + Math.abs(own().pos.z - mobileOrigin.z)).toBeGreaterThan(300);
+  await page.keyboard.up("KeyD");
+  await expect.poll(() => observed.some((snapshot) => snapshot.round === mobileRound && snapshot.events.some((event) => event.source === id && event.ability === "cinder_dart" && event.tick >= mobileTick && (event.kind === "hit" || event.kind === "crit")))).toBe(true);
   await expect(page.locator(".cast-wrap")).toBeHidden();
   // A released key must reach the authoritative movement queue before a new cast.
   await expect.poll(() => lastSteer !== null && lastSteer.dx === 0 && lastSteer.dz === 0).toBe(true);
@@ -99,11 +111,17 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   await expect.poll(() => state!.round).toBeGreaterThan(castBarRound);
   await ready();
   await page.keyboard.press("Tab");
+  // Retain this brief DOM transition instead of racing the 0.8-second GCD.
+  await page.evaluate(() => {
+    const spell = document.querySelector('[data-slot="0"]')!;
+    new MutationObserver(() => {
+      if (!spell.hasAttribute("data-saw-gcd-shadow") && spell.classList.contains("global-cooldown") && spell.querySelector(".cooldown-label")!.textContent === "") spell.setAttribute("data-saw-gcd-shadow", "true");
+    }).observe(spell, { attributes: true, childList: true, subtree: true });
+  });
   await page.keyboard.press("Digit3");
   await expect(page.locator("#proc-banner")).toContainText("KINDLING");
   // GCD darkens a ready spell without inventing a personal cooldown number.
-  await expect(page.locator('[data-slot="0"] .cooldown-label')).toHaveText("");
-  await expect(page.locator('[data-slot="0"]')).toHaveClass(/global-cooldown/);
+  await expect(page.locator('[data-slot="0"]')).toHaveAttribute("data-saw-gcd-shadow", "true");
 
   await gcd();
   await page.keyboard.press("Digit3");
@@ -130,7 +148,7 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   expect(own().casting).toBeNull();
   await expect(page.locator(".cast-wrap")).toBeHidden();
   expect(own().private!.chain.ready_until).toBe(0);
-  await page.keyboard.press("KeyE");
+  await page.keyboard.press("KeyQ");
   await expect.poll(() => own().shield).toBeGreaterThan(0);
   await gcd();
   const before = { ...own().pos };
@@ -164,6 +182,20 @@ test("Arcanist quick duel: licensed models, critical chain, instant payoff, barr
   await expect.poll(() => own().form).toBe("spellstorm");
   await expect(page.locator("#hud")).toContainText("Spellstorm");
   await page.screenshot({ path: info.outputPath("arcanist-spellstorm.png") });
+  const utilityRound = state!.round;
+  await page.getByRole("button", { name: "Restart duel", exact: true }).click();
+  await expect.poll(() => state!.round).toBeGreaterThan(utilityRound);
+  await ready();
+  await page.keyboard.press("Tab");
+  const meteorRound = state!.round, meteorTick = state!.tick;
+  await page.keyboard.press("KeyE");
+  await expect.poll(() => observed.some((snapshot) => snapshot.round === meteorRound && snapshot.areas.some((area) => area.owner === id && area.ability === "crownfall" && area.activates > area.started && area.started >= meteorTick))).toBe(true);
+  await page.screenshot({ path: info.outputPath("arcanist-crownfall.png") });
+  await gcd();
+  await page.keyboard.press("KeyC");
+  await expect.poll(() => own().private!.cooldowns.glasswake > state!.tick).toBe(true);
+  await page.keyboard.press("KeyF");
+  await expect.poll(() => own().private!.cooldowns.unweave > state!.tick).toBe(true);
   await page.getByRole("button", { name: "Bot insight", exact: true }).click();
   await expect(page.locator("#bot-insight")).toContainText("Easy:");
   await page.getByRole("button", { name: "Skilled", exact: true }).click();
