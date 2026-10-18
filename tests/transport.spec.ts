@@ -46,7 +46,7 @@ test("guest admission capacity, private state, socket replacement and invalid in
         ws.send(
           JSON.stringify({
             type: "join",
-            version: 5,
+            version: 6,
             room: "contract-" + seed,
             class_id: "ashweaver",
             resume,

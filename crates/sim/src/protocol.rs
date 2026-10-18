@@ -130,6 +130,7 @@ pub struct FlagView {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct PlayerView {
+    pub sun: Option<SunView>,
     pub id: u32,
     pub team: u8,
     pub class_id: String,
@@ -151,6 +152,7 @@ pub struct PlayerView {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct PrivateView {
+    pub embers: u8,
     pub energy: i32,
     pub resource: i32,
     pub gcd_until: u32,
@@ -166,6 +168,12 @@ pub struct CastView {
     pub ability: String,
     pub started: u32,
     pub ends: u32,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+pub struct SunView {
+    pub ends: u32,
+    pub charges: u8,
+    pub percent: u8,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct AreaView {

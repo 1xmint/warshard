@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "classes": {
     "briarwarden": {
       "name": "Briarwarden",
@@ -34,8 +34,8 @@
       }
     },
     "arcanist": {
-      "name": "Arcanist",
-      "description": "Turn sparks into a star. Chain critical hits, bank an instant Sunshard, and turn Firestorm burns into fresh Kindling.",
+      "name": "Cinderborn",
+      "description": "A living fire elemental. Build Embers, spread Ignite, and ascend into an explosive new form.",
       "base_form": "arcanist",
       "ultimate_forms": [
         "spellstorm"
@@ -50,10 +50,9 @@
       },
       "utilities": [
         "prism_ward",
-        "crownfall",
-        "unweave",
-        "glasswake"
-      ]
+        "crownfall"
+      ],
+      "ember_kit": true
     }
   },
   "forms": {
@@ -102,27 +101,28 @@
       ]
     },
     "arcanist": {
-      "name": "Arcanist",
+      "name": "Cinderborn",
       "duration": 0,
       "abilities": [
         "cinder_dart",
-        "flare_lance",
         "flashkindle",
         "sunshard",
+        "flare_lance",
         "riftstep"
       ]
     },
     "spellstorm": {
-      "name": "Firestorm",
+      "name": "Firestorm Ascendant",
       "activation": "firestorm",
       "duration": 240,
       "abilities": [
-        "cinder_dart",
-        "flare_lance",
-        "flashkindle",
-        "sunshard",
+        "infernal_jet",
+        "solar_burst",
+        "worldflare",
+        "living_sun",
         "riftstep"
-      ]
+      ],
+      "crit_bonus": 15
     }
   },
   "abilities": {
@@ -526,62 +526,80 @@
     },
     "cinder_dart": {
       "name": "Cinder Dart",
-      "description": "Cast while moving. A low-damage spark that starts Kindling even without a critical hit; a critical hit can complete the chain.",
+      "description": "Cast while moving. Build one Ember; a critical adds another. Ignite the target.",
       "icon": "dart",
       "target": "enemy",
       "range": 12500,
       "cast": 20,
       "cooldown": 1,
-      "cost": 8,
+      "cost": 0,
       "gcd": 16,
       "school": "ember",
       "effects": [
         {
           "kind": "damage",
-          "amount": 50
+          "amount": 45
+        },
+        {
+          "kind": "burn_area",
+          "amount": 12,
+          "radius": 450,
+          "duration": 120,
+          "interval": 20,
+          "proc_interval": 20
         }
       ],
       "crit_chance": 30,
-      "chains": true,
+      "chains": false,
       "consumes_chain": false,
       "projectile_step": 1200,
       "charges": 0,
       "cast_while_moving": true,
-      "primes_chain": true
+      "primes_chain": false,
+      "ember_gain": 1,
+      "crit_embers": true
     },
     "flare_lance": {
-      "name": "Flare Lance",
-      "description": "A quick 1.5-second cast with strong pressure. Interruptible; moving cancels it.",
+      "name": "Furnace Bolt",
+      "description": "Commit to a 1.5-second cast. Build two Embers; criticals add another. Spread your existing Ignite to one nearby enemy.",
       "icon": "lance",
       "target": "enemy",
       "range": 12500,
       "cast": 30,
       "cooldown": 1,
-      "cost": 12,
+      "cost": 0,
       "gcd": 16,
       "school": "ember",
       "effects": [
         {
           "kind": "damage",
-          "amount": 145
+          "amount": 125
+        },
+        {
+          "kind": "spread_burn",
+          "radius": 4000,
+          "targets": 1
         }
       ],
       "crit_chance": 30,
-      "chains": true,
+      "chains": false,
       "consumes_chain": false,
       "projectile_step": 1200,
-      "charges": 0
+      "charges": 0,
+      "primes_chain": false,
+      "ember_gain": 2,
+      "crit_embers": true
     },
     "flashkindle": {
       "name": "Flashkindle",
-      "description": "Two charges. Always critically strikes: deliberately complete your Kindling chain. Each charge returns in 10 seconds.",
+      "description": "Two charges. A guaranteed critical builds two Embers. Usable during another cast and off the global cooldown.",
       "icon": "ignite",
       "target": "enemy",
       "range": 12500,
       "cast": 0,
       "cooldown": 200,
-      "cost": 6,
-      "gcd": 16,
+      "cost": 0,
+      "gcd": 0,
       "school": "ember",
       "effects": [
         {
@@ -590,43 +608,59 @@
         }
       ],
       "crit_chance": 100,
-      "chains": true,
+      "chains": false,
       "consumes_chain": false,
       "projectile_step": 0,
-      "charges": 2
+      "charges": 2,
+      "primes_chain": false,
+      "ember_gain": 1,
+      "crit_embers": true,
+      "off_gcd": true
     },
     "sunshard": {
       "name": "Sunshard",
-      "description": "A powerful 4.5-second spell. Two critical hits bank an instant Sunshard for 10 seconds. Its critical hit can start the next Kindling chain.",
+      "description": "Spend three Embers to launch an instant heavy fireball. Critical hits seed the next Ember cycle.",
       "icon": "sun",
       "target": "enemy",
       "range": 12500,
-      "cast": 90,
+      "cast": 0,
       "cooldown": 1,
-      "cost": 16,
+      "cost": 0,
       "gcd": 16,
       "school": "ember",
       "effects": [
         {
           "kind": "damage",
-          "amount": 300
+          "amount": 240
+        },
+        {
+          "kind": "burn_area",
+          "amount": 20,
+          "radius": 450,
+          "duration": 120,
+          "interval": 20,
+          "proc_interval": 20
         }
       ],
       "crit_chance": 30,
-      "chains": true,
-      "consumes_chain": true,
+      "chains": false,
+      "consumes_chain": false,
       "projectile_step": 800,
-      "charges": 0
+      "charges": 0,
+      "primes_chain": false,
+      "ember_cost": 3,
+      "crit_embers": true,
+      "echoes": true
     },
     "riftstep": {
-      "name": "Riftstep",
-      "description": "Two charges. Blink up to 5m in the direction you face. Stops at terrain; roots prevent it. Charges recover one at a time every 12 seconds.",
+      "name": "Cinderstep",
+      "description": "Two charges. Dissolve into embers and move up to 5m along your facing. Roots and cover still stop it.",
       "icon": "blink",
       "target": "own",
       "range": 0,
       "cast": 0,
       "cooldown": 240,
-      "cost": 10,
+      "cost": 0,
       "gcd": 0,
       "school": "arcane",
       "effects": [
@@ -636,44 +670,20 @@
         }
       ],
       "off_gcd": true,
-      "charges": 2
-    },
-    "unweave": {
-      "name": "Sunderflare",
-      "description": "A searing arcane lash deals 70 damage and slows for 1.5 seconds. If it catches a cast, interrupt it and lock that spell school for 3 seconds. Cancels your own cast; off the global cooldown.",
-      "icon": "interrupt",
-      "target": "enemy",
-      "range": 12500,
-      "cast": 0,
-      "cooldown": 200,
-      "cost": 10,
-      "gcd": 0,
-      "school": "arcane",
-      "effects": [
-        {
-          "kind": "interrupt",
-          "duration": 60
-        },
-        {
-          "kind": "damage",
-          "amount": 70
-        },
-        {
-          "kind": "slow",
-          "duration": 30
-        }
-      ],
-      "off_gcd": true
+      "charges": 2,
+      "chains": false,
+      "consumes_chain": false,
+      "primes_chain": false
     },
     "prism_ward": {
-      "name": "Prism Ward",
-      "description": "Q: Absorb 240 damage for 6 seconds. Usable off the global cooldown without interrupting your cast.",
+      "name": "Molten Shell",
+      "description": "Absorb 240 damage for six seconds. Off the global cooldown; does not cancel your cast. Grants no interrupt immunity.",
       "icon": "barrier",
       "target": "own",
       "range": 0,
       "cast": 0,
       "cooldown": 400,
-      "cost": 10,
+      "cost": 0,
       "gcd": 0,
       "school": "arcane",
       "effects": [
@@ -683,33 +693,47 @@
           "duration": 120
         }
       ],
-      "off_gcd": true
+      "off_gcd": true,
+      "chains": false,
+      "consumes_chain": false,
+      "primes_chain": false
     },
     "crownfall": {
       "name": "Crownfall",
-      "description": "E: Cast for 0.75s, then drop a meteor after 1.2s onto the enemy's position. Deals 240 base damage to enemies within 2.7m at impact; critical hits build Kindling. Root them with Glasswake to set up the hit.",
+      "description": "A delayed meteor strikes the enemy position captured when casting completes. Ignite nearby enemies. One critical per impact can build an Ember.",
       "crit_chance": 30,
-      "chains": true,
+      "chains": false,
       "icon": "sun",
       "target": "enemy",
       "range": 12500,
       "cast": 15,
       "cooldown": 400,
-      "cost": 20,
+      "cost": 0,
       "gcd": 16,
       "school": "ember",
       "effects": [
         {
           "kind": "delayed_area",
-          "amount": 240,
+          "amount": 200,
           "radius": 2700,
           "delay": 24
+        },
+        {
+          "kind": "burn_area",
+          "amount": 18,
+          "radius": 2700,
+          "duration": 120,
+          "interval": 20,
+          "proc_interval": 20
         }
-      ]
+      ],
+      "consumes_chain": false,
+      "primes_chain": false,
+      "crit_embers": true
     },
     "firestorm": {
       "name": "Firestorm",
-      "description": "Transform for 12 seconds and launch a huge fireball. It explodes for 180 base damage within 4m and ignites enemies for 22 base damage each second for 8 seconds. Burn criticals build Kindling, at most once per second across all targets. Requires an enemy target and 100 energy.",
+      "description": "Ascend for twelve seconds, gain three Embers and launch an explosive fireball that ignites nearby enemies. Your primary abilities change.",
       "icon": "sun",
       "target": "enemy",
       "range": 14000,
@@ -719,30 +743,141 @@
       "gcd": 0,
       "school": "ember",
       "crit_chance": 40,
-      "chains": true,
+      "chains": false,
       "off_gcd": true,
       "projectile_step": 600,
       "effects": [
-        { "kind": "splash", "amount": 180, "radius": 4000 },
-        { "kind": "burn_area", "amount": 22, "radius": 4000, "duration": 160, "interval": 20, "proc_interval": 20 }
-      ]
+        {
+          "kind": "splash",
+          "amount": 180,
+          "radius": 4000
+        },
+        {
+          "kind": "burn_area",
+          "amount": 22,
+          "radius": 4000,
+          "duration": 160,
+          "interval": 20,
+          "proc_interval": 20
+        }
+      ],
+      "consumes_chain": false,
+      "primes_chain": false,
+      "crit_embers": true
     },
-    "glasswake": {
-      "name": "Glasswake",
-      "description": "C: Root nearby enemies within 2.7m for 3 seconds. Peel melee or set up Crownfall. Repeated roots have diminishing duration.",
-      "icon": "spark",
-      "target": "own",
-      "range": 0,
-      "cast": 0,
-      "cooldown": 360,
-      "cost": 12,
+    "infernal_jet": {
+      "name": "Infernal Jet",
+      "description": "A fast moving cast that feeds Embers and keeps enemies burning.",
+      "icon": "dart",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 10,
+      "cooldown": 1,
+      "cost": 0,
       "gcd": 16,
-      "school": "glass",
+      "school": "ember",
       "effects": [
         {
-          "kind": "root_area",
-          "radius": 2700,
-          "duration": 60
+          "kind": "damage",
+          "amount": 65
+        },
+        {
+          "kind": "burn_area",
+          "amount": 18,
+          "radius": 450,
+          "duration": 120,
+          "interval": 20,
+          "proc_interval": 20
+        }
+      ],
+      "crit_chance": 30,
+      "chains": false,
+      "consumes_chain": false,
+      "projectile_step": 1600,
+      "charges": 0,
+      "cast_while_moving": true,
+      "primes_chain": false,
+      "ember_gain": 1,
+      "crit_embers": true
+    },
+    "solar_burst": {
+      "name": "Solar Burst",
+      "description": "Two charged guaranteed-critical explosions. Build Embers once per cast, even when hitting a crowd.",
+      "icon": "ignite",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 0,
+      "cooldown": 120,
+      "cost": 0,
+      "gcd": 0,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "splash",
+          "amount": 85,
+          "radius": 2200
+        }
+      ],
+      "crit_chance": 100,
+      "chains": false,
+      "consumes_chain": false,
+      "projectile_step": 0,
+      "charges": 2,
+      "primes_chain": false,
+      "ember_gain": 1,
+      "crit_embers": true,
+      "off_gcd": true
+    },
+    "worldflare": {
+      "name": "Worldflare",
+      "description": "Spend three Embers on a miniature sun. Its explosion cashes out half of your remaining Ignite damage, consuming that portion of the burn.",
+      "icon": "sun",
+      "target": "enemy",
+      "range": 12500,
+      "cast": 0,
+      "cooldown": 1,
+      "cost": 0,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "splash",
+          "amount": 250,
+          "radius": 3500
+        },
+        {
+          "kind": "detonate_burn",
+          "percent": 50,
+          "radius": 3500
+        }
+      ],
+      "crit_chance": 30,
+      "chains": false,
+      "consumes_chain": false,
+      "projectile_step": 850,
+      "charges": 0,
+      "primes_chain": false,
+      "ember_cost": 3,
+      "crit_embers": true,
+      "echoes": true
+    },
+    "living_sun": {
+      "name": "Living Sun",
+      "description": "Conjure one orbiting sun for up to ten seconds. It echoes the direct damage of your next three finishers at 35% power. Echoes grant no resources, burns or further echoes.",
+      "icon": "sun",
+      "target": "own",
+      "range": 0,
+      "cast": 15,
+      "cooldown": 240,
+      "cost": 0,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "summon_echo",
+          "duration": 200,
+          "charges": 3,
+          "percent": 35
         }
       ]
     }

@@ -35,7 +35,7 @@ impl World {
         else {
             return;
         };
-        let burn = Burn {
+        let mut burn = Burn {
             view: BurnView {
                 owner,
                 target,
@@ -51,6 +51,7 @@ impl World {
         if let Some(existing) = self.burns.iter_mut().find(|burn| {
             burn.view.owner == owner && burn.view.target == target && burn.view.ability == ability
         }) {
+            burn.next = burn.next.min(existing.next);
             *existing = burn;
         } else {
             self.burns.push(burn);
@@ -81,6 +82,8 @@ impl World {
             let may_kindle = self.players[&view.owner].view.health > 0
                 && self.players[&view.owner].next_burn_chain <= self.tick;
             ability.chains &= may_kindle;
+            ability.ember_gain = 0;
+            ability.crit_embers &= may_kindle;
             let critical = self.strike(view.owner, view.target, &view.ability, &ability, amount);
             if critical && may_kindle {
                 self.players.get_mut(&view.owner).unwrap().next_burn_chain =
@@ -95,6 +98,67 @@ impl World {
                     .get(&burn.view.target)
                     .is_some_and(|p| p.view.health > 0)
         });
+    }
+    pub(super) fn detonate_burn(
+        &mut self,
+        owner: u32,
+        recipient: u32,
+        ability: &str,
+        percent: u8,
+        radius: i32,
+    ) {
+        let targets = self.enemies_in_area(owner, self.players[&recipient].view.pos, radius);
+        let mut damage = BTreeMap::<u32, i32>::new();
+        for burn in &mut self.burns {
+            if burn.view.owner == owner
+                && targets.contains(&burn.view.target)
+                && burn.next <= burn.view.ends
+            {
+                let pulses = (burn.view.ends - burn.next) / burn.interval + 1;
+                let remaining = burn.amount * (100 - i32::from(percent)) / 100;
+                *damage.entry(burn.view.target).or_default() +=
+                    (burn.amount - remaining) * pulses as i32;
+                burn.amount = remaining;
+            }
+        }
+        for (target, amount) in damage {
+            self.damage(owner, target, amount);
+            self.emit(owner, Some(target), ability, "detonate", amount);
+        }
+    }
+    pub(super) fn spread_burn(&mut self, owner: u32, recipient: u32, radius: i32, count: u8) {
+        let Some(original) = self.burns.iter().find(|burn| {
+            burn.view.owner == owner && burn.view.target == recipient && burn.view.ends > self.tick
+        }) else {
+            return;
+        };
+        let view = original.view.clone();
+        let amount = original.amount;
+        let interval = original.interval;
+        let proc_interval = original.proc_interval;
+        let next = original.next;
+        let mut targets = self.enemies_in_area(owner, self.players[&recipient].view.pos, radius);
+        targets.retain(|target| {
+            *target != recipient
+                && !self.burns.iter().any(|burn| {
+                    burn.view.owner == owner
+                        && burn.view.target == *target
+                        && burn.view.ability == view.ability
+                })
+        });
+        for target in targets.into_iter().take(usize::from(count)) {
+            self.burns.push(Burn {
+                view: BurnView {
+                    target,
+                    ..view.clone()
+                },
+                amount,
+                next,
+                interval,
+                proc_interval,
+            });
+            self.emit(owner, Some(target), &view.ability, "ignite", 0);
+        }
     }
 }
 
@@ -161,13 +225,13 @@ mod tests {
         );
         assert_eq!(world.players[&3].view.health, 20000);
         assert_eq!(world.players[&2].view.health, 20000 - 270);
-        world.players.get_mut(&1).unwrap().private.chain = ChainView::default();
+        world.players.get_mut(&1).unwrap().private.embers = 0;
         wait(&mut world, 20);
         assert_eq!(world.players[&2].view.health, 20000 - 270 - 33);
-        assert!(world.players[&1].private.chain.prepared_until > world.tick);
-        assert_eq!(world.players[&1].private.chain.ready_until, 0); // two victims, only one proc
+        assert_eq!(world.players[&1].private.embers, 1);
+        assert_eq!(world.players[&1].private.embers, 1); // two victims, only one proc
         wait(&mut world, 20);
-        assert!(world.players[&1].private.chain.ready_until > world.tick);
+        assert_eq!(world.players[&1].private.embers, 2);
         wait(&mut world, 120);
         assert!(world.burns.is_empty());
         assert_eq!(world.players[&2].view.health, 20000 - 270 - 8 * 33);

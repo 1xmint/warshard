@@ -31,6 +31,7 @@ fn main() {
         ProjectileView,
         CombatEvent,
         FlagView,
-        BurnView
+        BurnView,
+        SunView
     );
 }

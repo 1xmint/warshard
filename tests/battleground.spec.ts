@@ -168,10 +168,10 @@ test("real human queues fill balanced arena and battleground rosters; cancel and
       peer.socket.onopen = () => {
         const payload =
           (extra as { type?: string }).type === "join"
-            ? { type: "join", version: 5, class_id: "briarwarden", ...extra }
+            ? { type: "join", version: 6, class_id: "briarwarden", ...extra }
             : {
                 type: "queue",
-                version: 5,
+                version: 6,
                 playlist,
                 class_id: "briarwarden",
                 practice: false,

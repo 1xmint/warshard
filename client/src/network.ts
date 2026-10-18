@@ -60,14 +60,14 @@ export class Connection {
       this.pending
         ? this.send({
             type: "queue",
-            version: 5,
+            version: 6,
             playlist: this.pending.playlist,
             class_id: this.classId,
             practice: this.pending.practice,
           })
         : this.send({
             type: "join",
-            version: 5,
+            version: 6,
             room: this.room,
             class_id: this.classId,
             resume: sessionStorage.getItem(`warshard.token.${this.room}`),
@@ -83,7 +83,7 @@ export class Connection {
         return;
       }
       if (message.type === "welcome") {
-        if (message.version !== 5) {
+        if (message.version !== 6) {
           this.onError("protocol_version");
           this.close();
           return;

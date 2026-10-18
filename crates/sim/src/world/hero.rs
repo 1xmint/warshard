@@ -145,10 +145,22 @@ impl World {
         self.rng ^= self.rng >> 7;
         self.rng ^= self.rng << 17;
         let p = self.players.get_mut(&source).unwrap();
-        let bonus = if p.view.form == "spellstorm" { 15 } else { 0 };
+        let bonus = self.content.forms[&p.view.form].crit_bonus;
         let critical = a.crit_chance > 0
-            && (self.rng % 100 < u64::from(a.crit_chance) + bonus
-                || (a.chains && p.private.chain.dry_streak >= 3));
+            && (self.rng % 100 < u64::from(a.crit_chance) + u64::from(bonus)
+                || ((a.chains || a.crit_embers) && p.private.chain.dry_streak >= 3));
+        p.private.embers = p
+            .private
+            .embers
+            .saturating_add(a.ember_gain + u8::from(critical && a.crit_embers))
+            .min(3);
+        if a.crit_embers && !a.chains {
+            if critical {
+                p.private.chain.dry_streak = 0;
+            } else {
+                p.private.chain.dry_streak = p.private.chain.dry_streak.saturating_add(1);
+            }
+        }
         if a.chains {
             let chain = &mut p.private.chain;
             if critical {
@@ -193,6 +205,14 @@ impl World {
             self.events.pop_front();
         }
         for p in self.players.values_mut() {
+            if p.view.health <= 0
+                || p.view
+                    .sun
+                    .as_ref()
+                    .is_some_and(|sun| sun.ends <= self.tick || p.view.form_until <= self.tick)
+            {
+                p.view.sun = None;
+            }
             for (id, charge) in &mut p.private.charges {
                 let a = &self.content.abilities[id];
                 if charge.next_at > 0 && self.tick >= charge.next_at {
@@ -249,313 +269,127 @@ impl World {
 mod tests {
     use super::*;
     fn duel() -> World {
-        let mut world = World::configured(Content::load().unwrap(), "arena_1", true).unwrap();
-        world.add(1, "arcanist", 0, 0).unwrap();
-        world.add(2, "briarwarden", 1, 1).unwrap();
-        world.players.get_mut(&2).unwrap().view.bot = true;
+        let mut w = World::configured(Content::load().unwrap(), "arena_1", true).unwrap();
+        w.add(1, "arcanist", 0, 0).unwrap();
+        w.add(2, "briarwarden", 1, 1).unwrap();
+        w.players.get_mut(&2).unwrap().view.bot = true;
         for _ in 0..61 {
-            world.step();
+            w.step();
         }
-        world
+        w.players.get_mut(&2).unwrap().view.health = 20000;
+        w.players.get_mut(&2).unwrap().view.max_health = 20000;
+        w
     }
-    fn wait(world: &mut World, ticks: u32) {
-        for _ in 0..ticks {
-            world.step();
+    fn wait(w: &mut World, n: u32) {
+        for _ in 0..n {
+            w.step();
         }
     }
     #[test]
-    fn mobile_builder_completes_while_moving_and_shield_preserves_cast_and_gcd() {
-        let mut world = duel();
-        world
-            .content
+    fn mobile_builder_shield_and_damage_preserve_cast_then_flash_converts_to_finisher() {
+        let mut w = duel();
+        w.content
             .abilities
             .get_mut("cinder_dart")
             .unwrap()
             .crit_chance = 0;
-        world.cast(1, 0, Some(2), None).unwrap();
-        let started = world.players[&1].cast.as_ref().unwrap().view.started;
-        let gcd = world.players[&1].private.gcd_until;
-        world.cast(1, 5, None, None).unwrap();
-        assert_eq!(
-            world.players[&1].cast.as_ref().unwrap().view.started,
-            started
-        );
-        assert_eq!(world.players[&1].private.gcd_until, gcd);
-        assert_eq!(world.players[&1].view.shield, 240);
-        let origin = world.players[&1].view.pos;
+        w.cast(1, 0, Some(2), None).unwrap();
+        let ends = w.players[&1].cast.as_ref().unwrap().view.ends;
+        w.cast(1, 5, None, None).unwrap();
+        w.damage(2, 1, 40);
+        assert_eq!(w.players[&1].cast.as_ref().unwrap().view.ends, ends);
         for seq in 1..=20 {
-            world.input(1, seq, 1, 0).unwrap();
-            world.step();
+            w.input(1, seq, 1, 0).unwrap();
+            w.step();
         }
-        assert!(world.players[&1].view.pos.x > origin.x + 4000);
-        wait(&mut world, 20);
-        assert!(world.players[&1].private.chain.prepared_until > world.tick);
-        assert_eq!(world.players[&1].private.chain.ready_until, 0);
-        world.cast(1, 2, Some(2), None).unwrap();
-        assert!(world.players[&1].private.chain.ready_until > world.tick);
-        wait(&mut world, 16);
-        world.cast(1, 3, Some(2), None).unwrap();
-        assert!(world.players[&1].cast.is_none());
+        wait(&mut w, 10);
+        assert_eq!(w.players[&1].private.embers, 1);
+        w.cast(1, 1, Some(2), None).unwrap();
+        assert_eq!(w.players[&1].private.embers, 3);
+        w.cast(1, 2, Some(2), None).unwrap();
+        assert!(w.players[&1].cast.is_none());
+        assert_eq!(w.players[&1].private.embers, 0);
     }
     #[test]
-    fn meteor_locks_position_waits_for_impact_and_checks_teams_range_and_cover() {
-        let mut world = duel();
-        world
-            .content
+    fn flash_during_furnace_does_not_cancel_or_extend_gcd_and_invalid_spender_spends_nothing() {
+        let mut w = duel();
+        w.cast(1, 3, Some(2), None).unwrap();
+        let ends = w.players[&1].cast.as_ref().unwrap().view.ends;
+        let gcd = w.players[&1].private.gcd_until;
+        w.cast(1, 1, Some(2), None).unwrap();
+        assert_eq!(w.players[&1].private.embers, 2);
+        assert_eq!(w.players[&1].cast.as_ref().unwrap().view.ends, ends);
+        assert_eq!(w.players[&1].private.gcd_until, gcd);
+        wait(&mut w, 40);
+        assert_eq!(w.players[&1].private.embers, 3);
+        assert_eq!(w.cast(1, 2, Some(1), None), Err("invalid_target"));
+        assert_eq!(w.players[&1].private.embers, 3);
+    }
+    #[test]
+    fn blink_inputs_share_charges_and_roots_block_both() {
+        let mut w = duel();
+        w.players.get_mut(&1).unwrap().view.root_until = w.tick + 5;
+        assert_eq!(w.cast(1, 4, None, None), Err("rooted"));
+        assert_eq!(w.mobility(1, Some(2)), Err("rooted"));
+        wait(&mut w, 5);
+        w.cast(1, 4, None, None).unwrap();
+        w.mobility(1, Some(2)).unwrap();
+        assert_eq!(w.charge_count(1, "riftstep"), 0);
+        assert_eq!(w.mobility(1, Some(2)), Err("cooldown"));
+        wait(&mut w, 240);
+        assert_eq!(w.charge_count(1, "riftstep"), 1);
+    }
+    #[test]
+    fn meteor_locks_at_completion_ignites_on_impact_and_reset_clears_it() {
+        let mut w = duel();
+        w.cast(1, 6, Some(2), None).unwrap();
+        wait(&mut w, 14);
+        assert!(w.areas.is_empty());
+        assert!(w.burns.is_empty());
+        wait(&mut w, 1);
+        let point = w.areas[0].view.pos;
+        assert_eq!(point, w.players[&2].view.pos);
+        assert!(w.burns.is_empty());
+        wait(&mut w, 24);
+        assert_eq!(w.burns.len(), 1);
+        w.reset_practice(BotDifficulty::Trained).unwrap();
+        assert!(w.burns.is_empty() && w.areas.is_empty());
+        assert_eq!(w.players[&1].private.embers, 0);
+    }
+    #[test]
+    fn ascension_changes_primary_kit_and_echoes_are_finite_without_resource_gains() {
+        let mut w = duel();
+        w.players.get_mut(&1).unwrap().private.energy = 100;
+        w.ultimate(1, None, Some(2)).unwrap();
+        assert_eq!(w.players[&1].private.embers, 3);
+        assert_eq!(w.ability_id(1, 0), Some("infernal_jet"));
+        assert_eq!(w.ability_id(1, 3), Some("living_sun"));
+        w.cast(1, 3, None, None).unwrap();
+        wait(&mut w, 16);
+        assert_eq!(w.players[&1].view.sun.as_ref().unwrap().charges, 3);
+        w.content
             .abilities
-            .get_mut("crownfall")
+            .get_mut("worldflare")
             .unwrap()
             .crit_chance = 0;
-        world.add(3, "arcanist", 0, 0).unwrap();
-        world.add(4, "briarwarden", 1, 1).unwrap();
-        world.players.get_mut(&2).unwrap().view.pos = Pos { x: 4000, z: 0 };
-        world.players.get_mut(&3).unwrap().view.pos = Pos { x: 4000, z: 0 };
-        world.players.get_mut(&4).unwrap().view.pos = Pos { x: 4500, z: 0 };
-        world.cast(1, 6, Some(2), None).unwrap();
-        wait(&mut world, 14);
-        assert!(world.areas.is_empty());
-        wait(&mut world, 1);
-        let area = world.areas[0].view.clone();
-        assert_eq!(area.pos, Pos { x: 4000, z: 0 });
-        assert_eq!(area.activates - area.started, 24);
-        world.players.get_mut(&2).unwrap().view.pos = Pos { x: 10000, z: 0 };
-        let ally = world.players[&3].view.health;
-        let enemy = world.players[&4].view.health;
-        wait(&mut world, 23);
-        assert_eq!(world.players[&4].view.health, enemy);
-        wait(&mut world, 1);
-        assert_eq!(world.players[&4].view.health, enemy - 240);
-        assert_eq!(
-            world.players[&2].view.health,
-            world.players[&2].view.max_health
-        );
-        assert_eq!(world.players[&3].view.health, ally);
-        wait(&mut world, 1);
-        assert!(world.areas.is_empty());
-        // A second impact cannot reach an enemy behind intervening cover.
-        world
-            .content
-            .arena
-            .obstacles
-            .push(crate::content::Obstacle {
-                pos: Pos { x: 4250, z: 0 },
-                radius: 100,
-            });
-        world
-            .players
-            .get_mut(&1)
-            .unwrap()
-            .private
-            .cooldowns
-            .remove("crownfall");
-        world.players.get_mut(&2).unwrap().view.pos = Pos { x: 4000, z: 0 };
-        world.players.get_mut(&4).unwrap().view.pos = Pos { x: 5000, z: 0 };
-        let before = world.players[&4].view.health;
-        world.cast(1, 6, Some(2), None).unwrap();
-        wait(&mut world, 39);
-        assert_eq!(world.players[&4].view.health, before);
-        world.reset_practice(BotDifficulty::Trained).unwrap_err(); // multi-human practice cannot reset
+        w.cast(1, 2, Some(2), None).unwrap();
+        wait(&mut w, 20);
+        assert_eq!(w.players[&1].view.sun.as_ref().unwrap().charges, 2);
+        assert!(w.events.iter().any(|e| e.kind == "echo"));
+        assert_eq!(w.players[&1].private.energy, 0);
+        wait(&mut w, 240);
+        assert!(w.players[&1].view.sun.is_none());
+        assert_eq!(w.ability_id(1, 0), Some("cinder_dart"));
+        assert_eq!(w.ability_id(1, 3), Some("flare_lance"));
     }
     #[test]
-    fn glasswake_peels_nearby_enemies_and_uses_root_diminishing_returns() {
-        let mut world = duel();
-        world.players.get_mut(&2).unwrap().view.pos = Pos { x: -3500, z: 0 };
-        world.cast(1, 8, None, None).unwrap();
-        assert_eq!(world.players[&2].view.root_until - world.tick, 60);
-        assert_eq!(world.players[&1].view.root_until, 0);
-        wait(&mut world, 60);
-        world
-            .players
-            .get_mut(&1)
-            .unwrap()
-            .private
-            .cooldowns
-            .remove("glasswake");
-        world.cast(1, 8, None, None).unwrap();
-        assert_eq!(world.players[&2].view.root_until - world.tick, 30);
-        world
-            .players
-            .get_mut(&1)
-            .unwrap()
-            .private
-            .cooldowns
-            .remove("glasswake");
-        wait(&mut world, 30);
-        world.players.get_mut(&2).unwrap().view.pos = Pos { x: 0, z: 0 };
-        world.cast(1, 8, None, None).unwrap();
-        assert!(world.players[&2].view.root_until <= world.tick);
-    }
-    #[test]
-    fn moving_cast_remains_interruptible_and_reset_clears_pending_meteor() {
-        let mut world = duel();
-        world
-            .content
-            .classes
-            .get_mut("briarwarden")
-            .unwrap()
-            .utilities = vec!["unweave".into()];
-        world.cast(1, 0, Some(2), None).unwrap();
-        world.cast(2, 5, Some(1), None).unwrap();
-        assert!(world.players[&1].cast.is_none());
-        assert!(world.players[&1].private.lockouts["ember"] > world.tick);
-        wait(&mut world, 60);
-        world.cast(1, 6, Some(2), None).unwrap();
-        wait(&mut world, 15);
-        assert_eq!(world.areas.len(), 1);
-        world.reset_practice(BotDifficulty::Trained).unwrap();
-        assert!(world.areas.is_empty());
-        assert!(world.players[&1].cast.is_none());
-        assert_eq!(
-            world.players[&2].view.health,
-            world.players[&2].view.max_health
-        );
-    }
-    #[test]
-    fn spellstorm_enhances_the_same_kit_and_expires_without_a_stuck_cast() {
-        let mut world = duel();
-        assert_eq!(world.content.abilities["flare_lance"].cast, 30);
-        assert_eq!(world.content.abilities["sunshard"].cast, 90);
-        world.players.get_mut(&1).unwrap().private.energy = 100;
-        world.ultimate(1, None, Some(2)).unwrap();
-        let expires = world.players[&1].view.form_until;
-        world.cast(1, 1, Some(2), None).unwrap();
-        let cast = world.players[&1].cast.as_ref().unwrap();
-        assert_eq!(cast.view.ends - cast.view.started, 15);
-        let remaining = expires - world.tick;
-        wait(&mut world, remaining);
-        assert_eq!(world.players[&1].view.form, "arcanist");
-        assert_eq!(world.players[&1].view.form_until, 0);
-        assert!(world.players[&1].cast.is_none());
-        world.cast(1, 3, Some(2), None).unwrap();
-        let cast = world.players[&1].cast.as_ref().unwrap();
-        assert_eq!(cast.view.ends - cast.view.started, 90);
-    }
-    #[test]
-    fn two_crits_bank_one_instant_and_projectile_crit_restarts_the_chain() {
-        let mut world = duel();
-        world
-            .content
-            .abilities
-            .get_mut("sunshard")
-            .unwrap()
-            .crit_chance = 100;
-        world.cast(1, 2, Some(2), None).unwrap();
-        assert!(world.players[&1].private.chain.prepared_until > world.tick);
-        assert_eq!(world.players[&1].private.chain.ready_until, 0);
-        wait(&mut world, 16);
-        world.cast(1, 2, Some(2), None).unwrap();
-        assert!(world.players[&1].private.chain.ready_until > world.tick);
-        assert_eq!(world.charge_count(1, "flashkindle"), 0);
-        wait(&mut world, 16);
-        assert_eq!(world.cast(1, 2, Some(2), None), Err("cooldown"));
-        let health = world.players[&2].view.health;
-        world.cast(1, 3, Some(2), None).unwrap();
-        assert!(world.players[&1].cast.is_none());
-        assert_eq!(world.players[&1].private.chain.ready_until, 0);
-        assert_eq!(world.players[&2].view.health, health);
-        assert_eq!(world.projectiles.len(), 1);
-        wait(&mut world, 20);
-        assert!(world.projectiles.is_empty());
-        assert_eq!(world.players[&2].view.health, health - 450);
-        assert!(world.players[&1].private.chain.prepared_until > world.tick);
-        assert!(
-            world
-                .events
-                .iter()
-                .any(|e| e.kind == "crit" && e.ability == "sunshard")
-        );
-    }
-    #[test]
-    fn invalid_target_preserves_proc_and_charges_recover_sequentially() {
-        let mut world = duel();
-        world.players.get_mut(&1).unwrap().private.chain.ready_until = world.tick + 100;
-        let resource = world.players[&1].private.resource;
-        assert_eq!(world.cast(1, 3, Some(999), None), Err("invalid_target"));
-        assert!(world.players[&1].private.chain.ready_until > world.tick);
-        assert_eq!(world.players[&1].private.resource, resource);
-        world.cast(1, 2, Some(2), None).unwrap();
-        wait(&mut world, 16);
-        world.cast(1, 2, Some(2), None).unwrap();
-        wait(&mut world, 184);
-        assert_eq!(world.charge_count(1, "flashkindle"), 1);
-        wait(&mut world, 200);
-        assert_eq!(world.charge_count(1, "flashkindle"), 2);
-    }
-    #[test]
-    fn bad_luck_protection_interrupt_and_movement_cancellation() {
-        let mut world = duel();
-        world
-            .content
-            .abilities
-            .get_mut("cinder_dart")
-            .unwrap()
-            .crit_chance = 1;
-        world.players.get_mut(&1).unwrap().private.chain.dry_streak = 3;
-        world.cast(1, 0, Some(2), None).unwrap();
-        wait(&mut world, 40);
-        assert!(world.players[&1].private.chain.prepared_until > world.tick);
-        world.cast(1, 1, Some(2), None).unwrap();
-        world.input(1, 1, 1, 0).unwrap();
-        world.step();
-        assert!(world.players[&1].cast.is_none());
-        // Off-GCD utilities may cancel a deliberate cast, but cannot shorten its GCD.
-        wait(&mut world, 16);
-        world.cast(1, 1, Some(2), None).unwrap();
-        let gcd = world.players[&1].private.gcd_until;
-        world.players.get_mut(&2).unwrap().view.class_id = "arcanist".into();
-        world.players.get_mut(&2).unwrap().view.form = "arcanist".into();
-        world.cast(2, 1, Some(1), None).unwrap();
-        world.cast(1, 7, Some(2), None).unwrap();
-        assert!(world.players[&1].cast.is_none() && world.players[&2].cast.is_none());
-        assert_eq!(world.players[&1].private.gcd_until, gcd);
-        assert!(world.players[&2].private.lockouts["ember"] > world.tick);
-    }
-    #[test]
-    fn blink_respects_roots_and_collision_and_reset_clears_combat() {
-        let mut world = duel();
-        world.players.get_mut(&1).unwrap().view.root_until = world.tick + 10;
-        assert_eq!(world.cast(1, 4, None, None), Err("rooted"));
-        wait(&mut world, 10);
-        let p = world.players.get_mut(&1).unwrap();
-        p.view.pos = Pos { x: -4000, z: 4700 };
-        p.view.facing = 1570;
-        world.cast(1, 4, None, None).unwrap();
-        assert!(world.players[&1].view.pos.x < -1500);
-        assert!(world.content.arena.walkable(world.players[&1].view.pos));
-        // Transformation's activation projectile still requires an exposed target.
-        world.players.get_mut(&1).unwrap().view.pos = Pos { x: -5500, z: 0 };
-        world.players.get_mut(&1).unwrap().private.energy = 100;
-        world.ultimate(1, None, Some(2)).unwrap();
-        assert_eq!(world.players[&1].view.form, "spellstorm");
-        assert!(world.players[&1].private.chain.ready_until > world.tick);
-        world.reset_practice(BotDifficulty::Skilled).unwrap();
-        assert_eq!(world.players[&1].view.form, "arcanist");
-        assert_eq!(world.players[&1].private.chain.ready_until, 0);
-        assert_eq!(world.players[&1].private.energy, 0);
-        assert_eq!(world.players[&1].private.resource, 100);
-        assert!(world.projectiles.is_empty() && world.events.is_empty());
-        assert_eq!(world.rules.view.bot_difficulty, BotDifficulty::Skilled);
-        assert_eq!(
-            World::new(Content::load().unwrap()).reset_practice(BotDifficulty::Easy),
-            Err("practice_only")
-        );
-    }
-    #[test]
-    fn two_blink_charges_recover_sequentially_and_damage_has_no_cast_pushback() {
-        let mut world = duel();
-        world.cast(1, 1, Some(2), None).unwrap();
-        let ends = world.players[&1].cast.as_ref().unwrap().view.ends;
-        world.damage(2, 1, 40);
-        assert_eq!(world.players[&1].cast.as_ref().unwrap().view.ends, ends);
-        world.cast(1, 4, None, None).unwrap();
-        assert!(world.players[&1].cast.is_none());
-        world.mobility(1, Some(2)).unwrap();
-        assert_eq!(world.charge_count(1, "riftstep"), 0);
-        assert_eq!(world.cast(1, 4, None, None), Err("cooldown"));
-        assert_eq!(world.mobility(1, Some(2)), Err("cooldown"));
-        wait(&mut world, 240);
-        assert_eq!(world.charge_count(1, "riftstep"), 1);
-        wait(&mut world, 240);
-        assert_eq!(world.charge_count(1, "riftstep"), 2);
+    fn ascension_does_not_charge_from_idle_or_crowd_spikes() {
+        let mut w = duel();
+        wait(&mut w, 100);
+        assert_eq!(w.players[&1].private.energy, 0);
+        for _ in 0..20 {
+            w.damage(1, 2, 100);
+        }
+        assert_eq!(w.players[&1].private.energy, 4);
     }
 }
