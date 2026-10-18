@@ -62,7 +62,7 @@ for (const allowLock of [true, false]) {
       for (const type of ["pointerdown", "pointerup", "mousedown", "mouseup", "mousemove", "pointercancel"])
         document.addEventListener(type, (event) => {
           const e = event as MouseEvent;
-          events.push({ type, button: e.button, buttons: e.buttons,
+          events.push({ type, trusted: e.isTrusted, button: e.button, buttons: e.buttons,
             x: e.clientX, y: e.clientY, dx: e.movementX, dy: e.movementY,
             cursor: document.querySelector<HTMLElement>("#game-cursor")?.style.transform,
             target: (e.target as HTMLElement)?.id, lock: document.pointerLockElement?.id });
