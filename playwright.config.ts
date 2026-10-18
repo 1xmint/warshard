@@ -12,9 +12,12 @@ export default defineConfig({
     // Exercise the shipped low-resolution setting on CI's software GPU.
     storageState: {
       cookies: [],
-      origins: [{ origin: "http://localhost:5173", localStorage: [
-        { name: "warshard.quality", value: "2" },
-      ] }],
+      origins: [
+        {
+          origin: "http://localhost:5173",
+          localStorage: [{ name: "warshard.quality", value: "2" }],
+        },
+      ],
     },
     trace: "retain-on-failure",
     launchOptions: {

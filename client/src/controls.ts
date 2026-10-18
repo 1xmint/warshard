@@ -60,9 +60,13 @@ export class MouseControls {
       begin(e);
     });
     canvas.addEventListener("mousedown", begin);
-    document.addEventListener("mousedown", (e) => {
-      if (this.locked()) begin(e);
-    }, true);
+    document.addEventListener(
+      "mousedown",
+      (e) => {
+        if (this.locked()) begin(e);
+      },
+      true,
+    );
 
     const move = (e: MouseEvent) => {
       if (!this.enabled()) {

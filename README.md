@@ -31,7 +31,7 @@ npm run test:e2e
 
 Run tests on GitHub CI to keep the shared PC responsive; local client validation is `npm run build`, and Rust validation is scoped `cargo check`/`cargo clippy`.
 
-`check` runs Rust formatting, clippy, simulation tests, strict TypeScript and the production client build. `test:e2e` starts real services and browser clients. CI uses the same commands. Commit both lockfiles.
+`check` runs Rust formatting, clippy, simulation tests, strict TypeScript and the production client build. `test:e2e` starts real services and browser clients. CI runs the full suite in desktop Chromium with `xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" npm run test:e2e -- --headed`, using the shipped low-resolution graphics setting. The headless shell emitted unrequested pointer-lock motion after button releases; native controls are validated against the desktop browser. Commit both lockfiles.
 
 For the bounded 20-bot correctness scenario and timing sample, run `cargo test --release -p warshard-server practice_bots -- --nocapture`. This reports simulation/bot decision timing and a snapshot size; it does not measure rendered-client or hosting capacity.
 

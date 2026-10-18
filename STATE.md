@@ -8,12 +8,13 @@
 - Tests run on GitHub CI; only scoped compile/lint work runs on Josh's PC.
 
 ## Current state
-- Foundation PR #6 is merged. PR #9 targets main and includes all of PR #7's team/CTF practice and controls work, plus the Arcanist milestone; #7 can be closed as superseded after #9 passes and lands.
+- Foundation PR #6 is merged. PR #9 is the integration record for all of PR #7's team/CTF practice and controls work plus the Arcanist milestone; it supersedes #7. Consult #9 for integration status and final CI evidence.
 - WoW-style steering and session-held cursor capture work in Josh's Brave browser. Cursor event work is batched per display frame. Slight lag was reported; Brave FPS/network latency are not measured.
 - PR #7's Linux cursor chord regression was fixed by recognizing Pointer Events chord transitions. CI subsequently exposed slow-browser five-second setup waits and the former five-minute suite limit; the combined branch must prove these flows before integration. Suite budget is ten minutes.
 - Arcanist simulation, charge/proc/projectile events, adjustable bot decisions, quick duels, HUD feedback, synthesized sound and licensed art are implemented. Scoped compile/lint checks, CI's simulation/build stage and Arcanist browser flow (including earned Spellstorm) pass. Live review confirmed animated mages, tiled court, columns, walls and difficulty/reset/menu controls. PR #9 owns final integration evidence; fun and balance require Josh's playtest.
 - Browser evidence exposed reused movement sequence numbers after reset; these now remain monotonic within a session. Rendering pauses during connection/recovery and in hidden tabs so expensive GPU work does not compete with handshakes. Startup/recovery assertions retain their outcomes with bounded software-GPU allowances.
 - Saved render quality now applies during graphics startup. CI exercises the shipped low-resolution setting rather than oversubscribing software graphics with two full-resolution clients. Initial camera focus snaps to the player; cursor visibility reacts immediately to button transitions, while motion/picking remain batched.
+- Headless Chromium emitted unrequested large relative movements after button releases. The same native control assertions passed in desktop Chromium on Xvfb (run 39093928834); CI now runs the full suite in that environment. The cursor explicitly restores its drag anchor before becoming visible.
 
 ## Next slices
 1. Run CI, resolve correctness/browser regressions, inspect the recorded Arcanist art/flow.
