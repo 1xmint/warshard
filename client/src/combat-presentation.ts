@@ -14,7 +14,7 @@ export class CombatPresentation {
   private at = 0;
   private lastEvent = 0;
   private shots = new Map<number, { core: Mesh; trail: Mesh; glow: Mesh }>();
-  private bursts: { meshes: Mesh[]; born: number; life: number }[] = [];
+  private bursts: { meshes: Mesh[]; born: number; life: number; ward?: boolean }[] = [];
   private numbers: { element: HTMLElement; pos: Pos; born: number }[] = [];
   private materials = new Map<string, StandardMaterial>();
   private halo: DynamicTexture | null = null;
@@ -115,41 +115,118 @@ export class CombatPresentation {
       const source = state.players.find((p) => p.id === event.source);
       if (event.kind === "cast")
         this.renderer.cue(event.source, source?.class_id === "briarwarden");
+      if (event.kind === "cast" && event.ability === "prism_ward") {
+        const shell = MeshBuilder.CreateSphere(
+          "prism-ward-activation",
+          { diameter: 1.7, segments: 12 },
+          this.renderer.scene,
+        );
+        shell.position.set(event.pos.x / 1000, 1.05, event.pos.z / 1000);
+        shell.material = this.glowMaterial("#57ddeb");
+        shell.isPickable = false;
+        const footRim = MeshBuilder.CreateTorus(
+          "prism-ward-foot-rim",
+          { diameter: 2.15, thickness: 0.075, tessellation: 32 },
+          this.renderer.scene,
+        );
+        footRim.position.set(event.pos.x / 1000, 0.16, event.pos.z / 1000);
+        footRim.rotation.x = Math.PI / 2;
+        footRim.material = this.material("#b3fbff");
+        footRim.isPickable = false;
+        const crownRim = MeshBuilder.CreateTorus(
+          "prism-ward-crown-rim",
+          { diameter: 2.05, thickness: 0.055, tessellation: 32 },
+          this.renderer.scene,
+        );
+        crownRim.position.set(event.pos.x / 1000, 1.15, event.pos.z / 1000);
+        crownRim.rotation.y = Math.PI / 2;
+        crownRim.material = this.material("#57ddeb");
+        crownRim.isPickable = false;
+        this.bursts.push({
+          meshes: [shell, footRim, crownRim],
+          born: performance.now(),
+          life: 850,
+          ward: true,
+        });
+      }
+      const sunderflare =
+        event.ability === "unweave" &&
+        (event.kind === "hit" || event.kind === "crit");
+      if (sunderflare) {
+        const origin = source?.pos ?? event.pos;
+        const start = new Vector3(0, 1.15, 0);
+        const offset = new Vector3(
+          (event.pos.x - origin.x) / 1000,
+          -0.1,
+          (event.pos.z - origin.z) / 1000,
+        );
+        const side = new Vector3(-offset.z, 0, offset.x).normalize();
+        const lash = Array.from({ length: 7 }, (_, index) =>
+          start
+            .add(offset.scale(index / 6))
+            .add(side.scale(index === 0 || index === 6 ? 0 : (index % 2 ? 0.36 : -0.3)))
+            .add(new Vector3(0, index === 3 ? 0.32 : 0, 0)),
+        );
+        const arc = MeshBuilder.CreateLineSystem(
+          "sunderflare-arc",
+          { lines: [lash] },
+          this.renderer.scene,
+        );
+        arc.position.set(origin.x / 1000, 0, origin.z / 1000);
+        arc.color = Color3.FromHexString(event.kind === "crit" ? "#fff0a3" : "#ff8746");
+        arc.isPickable = false;
+        const flash = MeshBuilder.CreateTorus(
+          "sunderflare-impact",
+          { diameter: 1.45, thickness: 0.11, tessellation: 24 },
+          this.renderer.scene,
+        );
+        flash.position.set(event.pos.x / 1000, 1.0, event.pos.z / 1000);
+        flash.material = this.material(event.kind === "crit" ? "#fff0a3" : "#ff9b55");
+        flash.isPickable = false;
+        this.bursts.push({
+          meshes: [arc, flash],
+          born: performance.now(),
+          life: 460,
+        });
+      }
       if (
         ["hit", "crit", "blink", "depart", "ascend", "interrupt", "nova"].includes(
           event.kind,
-        )
+        ) && !sunderflare
       ) {
         const blink = event.kind === "blink" || event.kind === "depart";
         const ascension = event.kind === "ascend";
         const glasswake = event.ability === "glasswake";
+        const flashkindle = event.ability === "flashkindle" && event.kind === "crit";
         const color = blink
           ? "#8cdce8"
           : glasswake
             ? "#71e8f1"
           : ascension
             ? "#ffc95c"
+            : flashkindle
+              ? "#fff1b5"
             : event.kind === "crit"
               ? "#fff0ad"
               : event.ability === "sunshard"
                 ? "#ffe6a1"
                 : "#ff8746";
-        const meshes = [0, ...(ascension ? [1, 2] : [])].map((ring) => {
+        const meshes = [0, ...(ascension || flashkindle ? [1, 2] : [])].map((ring) => {
           const mesh = MeshBuilder.CreateTorus(
             "spell-impact",
-            { diameter: glasswake ? 5.4 : ascension ? 1.4 + ring * 0.55 : 1.05, thickness: glasswake ? 0.13 : ascension ? 0.12 : 0.09, tessellation: 48 },
+            { diameter: glasswake ? 5.4 : flashkindle ? 1.25 + ring * 0.58 : ascension ? 1.4 + ring * 0.55 : 1.05, thickness: glasswake ? 0.13 : ascension || flashkindle ? 0.12 : 0.09, tessellation: glasswake || flashkindle ? 40 : 20 },
             this.renderer.scene,
           );
-          mesh.position.set(event.pos.x / 1000, blink || glasswake ? 0.18 : 1.05 + ring * 0.18, event.pos.z / 1000);
+          mesh.position.set(event.pos.x / 1000, blink || glasswake ? 0.18 : flashkindle ? 0.8 + ring * 0.18 : 1.05 + ring * 0.18, event.pos.z / 1000);
           mesh.material = this.material(color);
           mesh.isPickable = false;
           return mesh;
         });
         // A single line mesh supplies the burst of embers, rather than many particle draw calls.
         if (!blink && !glasswake && event.kind !== "interrupt") {
-          const lines = Array.from({ length: ascension ? 12 : 7 }, (_, i) => {
+          const lines = Array.from({ length: ascension ? 12 : flashkindle ? 10 : 7 }, (_, i) => {
             const angle = i * 2.39996 + event.id;
-            const radius = ascension ? 1.6 : event.ability === "sunshard" ? 1.25 : 0.75;
+            const radius = ascension ? 1.6 : flashkindle ? 1.15 : event.ability === "sunshard" ? 1.25 : 0.75;
             const from = new Vector3(Math.cos(angle) * radius * 0.35, 0.2 + i % 3 * 0.13, Math.sin(angle) * radius * 0.35);
             return [from, from.scale(2.1)];
           });
@@ -162,7 +239,7 @@ export class CombatPresentation {
         this.bursts.push({
           meshes,
           born: performance.now(),
-          life: ascension ? 1200 : 520,
+          life: ascension ? 1200 : flashkindle ? 760 : 520,
         });
       }
       if (event.amount > 0 || event.kind === "interrupt") {
@@ -170,7 +247,7 @@ export class CombatPresentation {
         element.className = `combat-number ${event.kind}`;
         element.textContent =
           event.kind === "interrupt"
-            ? "UNWOVEN"
+            ? event.ability === "unweave" ? "SUNDERED" : "INTERRUPTED"
             : `${event.kind === "crit" ? "✦ " : ""}${event.amount}`;
         document.body.append(element);
         this.numbers.push({ element, pos: event.pos, born: performance.now() });
@@ -252,6 +329,15 @@ export class CombatPresentation {
       if (age >= 1) {
         effect.meshes.forEach((mesh) => mesh.dispose());
         return false;
+      }
+      if (effect.ward) {
+        const pulse = 0.82 + Math.sin(age * Math.PI * 4) * 0.12;
+        effect.meshes.forEach((mesh, i) => {
+          mesh.scaling.setAll(pulse + age * (i === 0 ? 0.3 : 0.18));
+          if (i > 0) mesh.rotation.y = age * Math.PI * (i === 1 ? 2 : -2);
+          mesh.visibility = Math.max(0, 1 - age * 0.82);
+        });
+        return true;
       }
       effect.meshes.forEach((mesh, i) => {
         mesh.scaling.setAll(0.4 + age * (i === 0 ? 2.7 : 3.4));
