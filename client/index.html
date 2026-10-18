@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#101b21" />
+    <title>Warshard — The Shattered Court</title>
+  </head>
+  <body>
+    <canvas id="arena" aria-label="Warshard arena"></canvas>
+    <div id="labels"></div>
+    <header>
+      <a class="brand" href="/"><span class="shard">◇</span> WARSHARD</a>
+      <div class="location">
+        <span>THE SHATTERED COURT</span><small>UNRANKED ARENA · 1 VS 1</small>
+      </div>
+      <div class="connection">
+        <i id="light"></i><span id="connection">OFFLINE</span
+        ><button
+          id="soundless"
+          title="Show controls"
+          aria-label="Show controls"
+        >
+          ?
+        </button>
+      </div>
+    </header>
+    <section class="unit-frame self hidden" id="self-frame">
+      <div class="portrait">✦</div>
+      <div class="unit-content">
+        <div class="unit-title">
+          <span id="self-name"></span><small>YOU</small>
+        </div>
+        <div class="bar">
+          <div id="self-health"></div>
+          <span id="self-hp"></span>
+        </div>
+        <div class="resource"><div id="resource"></div></div>
+        <small id="self-status"></small>
+      </div>
+    </section>
+    <section class="unit-frame target hidden" id="target-frame">
+      <div class="unit-content">
+        <div class="unit-title">
+          <span id="target-name"></span><small>ENEMY TARGET</small>
+        </div>
+        <div class="bar enemy">
+          <div id="target-health"></div>
+          <span id="target-hp"></span>
+        </div>
+        <small id="target-status"></small>
+      </div>
+      <div class="portrait enemy-portrait">⌖</div>
+    </section>
+    <div class="match-status hidden" id="match-status">
+      <span class="eyebrow">THE SHATTERED COURT</span>
+      <h2 id="phase"></h2>
+      <p id="phase-detail"></p>
+    </div>
+    <aside class="session hidden" id="session">
+      <span class="eyebrow">ARENA CHANNEL</span>
+      <div><i></i><span id="room-label"></span></div>
+      <small id="round-label"></small><button id="leave">Leave arena</button>
+    </aside>
+    <aside class="chronicle hidden" id="chronicle">
+      <span class="eyebrow">COMBAT CHRONICLE</span>
+      <div id="log" aria-live="polite"></div>
+    </aside>
+    <div id="notice" role="status"></div>
+    <footer class="hud hidden" id="hud">
+      <div class="cast-wrap">
+        <span id="cast-label"></span>
+        <div class="cast-bar"><div id="cast-progress"></div></div>
+      </div>
+      <div class="ability-row">
+        <div class="kit">
+          <span class="eyebrow" id="form-name"></span>
+          <div id="abilities"></div>
+        </div>
+        <button id="ultimate" title="R · Transform when energy is full">
+          <span class="key">R</span><span class="ult-icon">✧</span
+          ><span id="ult-energy">0%</span><small>ASCEND</small>
+        </button>
+      </div>
+      <div class="hud-legend">
+        <span><kbd>W A S D</kbd> Move</span
+        ><span><kbd>Tab</kbd> Cycle target</span
+        ><span><kbd>1 – 5</kbd> Abilities</span><span><kbd>R</kbd> Ascend</span>
+      </div>
+    </footer>
+    <div class="vignette"></div>
+    <main id="lobby">
+      <div class="lobby-mark">◇</div>
+      <span class="eyebrow">ENTER THE SHATTERED COURT</span>
+      <h1>Claim your shard.</h1>
+      <p class="intro">
+        Steel meets spell. Two rivals. One living battlefield.<br />Choose your
+        calling and step into the arena.
+      </p>
+      <form id="join-form">
+        <div class="class-grid">
+          <button
+            type="button"
+            class="class-card selected"
+            data-class="briarwarden"
+            aria-pressed="true"
+          >
+            <span class="class-role">MELEE · CONTROL</span
+            ><span class="class-sigil warden">♜</span
+            ><strong>Briarwarden</strong>
+            <p>Iron resolve. Living armor.<br />Awaken the Verdant Crown.</p>
+            <span class="class-select">SELECTED <b>✓</b></span></button
+          ><button
+            type="button"
+            class="class-card"
+            data-class="ashweaver"
+            aria-pressed="false"
+          >
+            <span class="class-role">RANGED · SPELLCASTER</span
+            ><span class="class-sigil weaver">✧</span><strong>Ashweaver</strong>
+            <p>Weave fire into fate.<br />Become the Solar Ascendant.</p>
+            <span class="class-select">CHOOSE CALLING <b>→</b></span>
+          </button>
+        </div>
+        <label class="room-input"
+          >ARENA CHANNEL
+          <input
+            id="room"
+            name="room"
+            value="the-court"
+            maxlength="32"
+            pattern="[A-Za-z0-9_\-]+"
+            required
+            autocomplete="off"
+          /><small
+            >Share this name with a rival to meet in the same arena.</small
+          ></label
+        ><button type="submit" id="join">ENTER ARENA <span>↗</span></button>
+        <p id="lobby-error" role="alert"></p>
+      </form>
+      <p class="lobby-foot">
+        FIRST PLAYABLE · ORIGINAL PROCEDURAL ART · SERVER-AUTHORITATIVE
+      </p>
+    </main>
+    <dialog id="help">
+      <button id="close-help" aria-label="Close controls">×</button
+      ><span class="eyebrow">FIELD GUIDE</span>
+      <h2>Knowledge is your advantage.</h2>
+      <p>
+        WASD moves. Tab cycles living enemies; click a character to select it.
+        Keys 1–5 activate the current kit. Hover an ability for its range, cast
+        time and effect.
+      </p>
+      <p>
+        For a ground ability, press its key then click the arena. Escape cancels
+        placement. Moving cancels a cast. Stone pillars block movement and line
+        of sight.
+      </p>
+      <p>
+        Build energy through combat. At 100%, press R for a 12-second
+        transformation and five alternate abilities. Shields absorb damage;
+        interrupts cancel casts and briefly lock their school.
+      </p>
+      <p>
+        Use two browser tabs in the same arena channel to duel. A round ends on
+        defeat and restarts automatically. There is no audio in this slice.
+      </p>
+    </dialog>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

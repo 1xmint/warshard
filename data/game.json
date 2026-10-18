@@ -1,0 +1,497 @@
+{
+  "version": 1,
+  "classes": {
+    "briarwarden": {
+      "name": "Briarwarden",
+      "description": "Hold the line. Close the distance, silence a spell, and awaken the living crown.",
+      "base_form": "warden",
+      "ultimate_forms": ["verdant_crown"],
+      "health": 1500,
+      "color": "#6ad9bb"
+    },
+    "ashweaver": {
+      "name": "Ashweaver",
+      "description": "Control the field. Weave embers, interrupt your rival, and become a falling star.",
+      "base_form": "weaver",
+      "ultimate_forms": ["solar_ascendant"],
+      "health": 1250,
+      "color": "#f0a56f"
+    }
+  },
+  "forms": {
+    "warden": {
+      "name": "Briarwarden",
+      "duration": 0,
+      "abilities": [
+        "thorncut",
+        "cleave",
+        "bark",
+        "hush",
+        "snare"
+      ]
+    },
+    "verdant_crown": {
+      "name": "Verdant Crown",
+      "duration": 240,
+      "abilities": [
+        "crown_cut",
+        "crown_crush",
+        "crown_guard",
+        "crown_hush",
+        "crown_bind"
+      ]
+    },
+    "weaver": {
+      "name": "Ashweaver",
+      "duration": 0,
+      "abilities": [
+        "bolt",
+        "spark",
+        "veil",
+        "sever",
+        "rain"
+      ]
+    },
+    "solar_ascendant": {
+      "name": "Solar Ascendant",
+      "duration": 240,
+      "abilities": [
+        "nova_bolt",
+        "nova_spark",
+        "nova_veil",
+        "nova_sever",
+        "nova_rain"
+      ]
+    }
+  },
+  "abilities": {
+    "thorncut": {
+      "name": "Thorncut",
+      "description": "A quick close-range strike.",
+      "icon": "Ⅰ",
+      "target": "enemy",
+      "range": 2200,
+      "cast": 0,
+      "cooldown": 20,
+      "cost": 4,
+      "gcd": 20,
+      "school": "steel",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 95
+        }
+      ]
+    },
+    "cleave": {
+      "name": "Ironbloom",
+      "description": "A heavy committed strike.",
+      "icon": "Ⅱ",
+      "target": "enemy",
+      "range": 2400,
+      "cast": 14,
+      "cooldown": 70,
+      "cost": 12,
+      "gcd": 20,
+      "school": "steel",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 200
+        }
+      ]
+    },
+    "bark": {
+      "name": "Barkguard",
+      "description": "Absorb damage for 6 seconds.",
+      "icon": "Ⅲ",
+      "target": "own",
+      "range": 0,
+      "cast": 0,
+      "cooldown": 160,
+      "cost": 15,
+      "gcd": 20,
+      "school": "steel",
+      "effects": [
+        {
+          "kind": "shield",
+          "amount": 260,
+          "duration": 120
+        }
+      ]
+    },
+    "hush": {
+      "name": "Hushblade",
+      "description": "Interrupt a cast; lock its school for 3 seconds.",
+      "icon": "Ⅳ",
+      "target": "enemy",
+      "range": 2500,
+      "cast": 0,
+      "cooldown": 160,
+      "cost": 8,
+      "gcd": 1,
+      "school": "steel",
+      "effects": [
+        {
+          "kind": "interrupt",
+          "duration": 60
+        }
+      ]
+    },
+    "snare": {
+      "name": "Briarbind",
+      "description": "Root a nearby enemy for 2 seconds.",
+      "icon": "Ⅴ",
+      "target": "enemy",
+      "range": 4500,
+      "cast": 0,
+      "cooldown": 140,
+      "cost": 10,
+      "gcd": 20,
+      "school": "thorn",
+      "effects": [
+        {
+          "kind": "root",
+          "duration": 40
+        },
+        {
+          "kind": "damage",
+          "amount": 35
+        }
+      ]
+    },
+    "bolt": {
+      "name": "Emberthread",
+      "description": "A ranged cast of searing thread.",
+      "icon": "Ⅰ",
+      "target": "enemy",
+      "range": 13000,
+      "cast": 28,
+      "cooldown": 28,
+      "cost": 8,
+      "gcd": 20,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 160
+        }
+      ]
+    },
+    "spark": {
+      "name": "Cinderlash",
+      "description": "Instant flame that slows for 2 seconds.",
+      "icon": "Ⅱ",
+      "target": "enemy",
+      "range": 10000,
+      "cast": 0,
+      "cooldown": 65,
+      "cost": 12,
+      "gcd": 20,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 95
+        },
+        {
+          "kind": "slow",
+          "duration": 40
+        }
+      ]
+    },
+    "veil": {
+      "name": "Ashveil",
+      "description": "Wrap yourself in an absorbing ward.",
+      "icon": "Ⅲ",
+      "target": "own",
+      "range": 0,
+      "cast": 0,
+      "cooldown": 160,
+      "cost": 15,
+      "gcd": 20,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "shield",
+          "amount": 220,
+          "duration": 120
+        }
+      ]
+    },
+    "sever": {
+      "name": "Threadsever",
+      "description": "Interrupt a cast; lock its school for 3 seconds.",
+      "icon": "Ⅳ",
+      "target": "enemy",
+      "range": 11000,
+      "cast": 0,
+      "cooldown": 180,
+      "cost": 8,
+      "gcd": 1,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "interrupt",
+          "duration": 60
+        }
+      ]
+    },
+    "rain": {
+      "name": "Cinderfall",
+      "description": "Place a 4-second field after a 1.5-second cast. No enemy warning until impact.",
+      "icon": "Ⅴ",
+      "target": "ground",
+      "range": 12500,
+      "cast": 30,
+      "cooldown": 160,
+      "cost": 20,
+      "gcd": 20,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "area",
+          "amount": 65,
+          "radius": 2700,
+          "duration": 80,
+          "interval": 20
+        }
+      ]
+    },
+    "crown_cut": {
+      "name": "Crownstrike",
+      "description": "Empowered close-range strike.",
+      "icon": "Ⅰ",
+      "target": "enemy",
+      "range": 3000,
+      "cast": 0,
+      "cooldown": 16,
+      "cost": 3,
+      "gcd": 16,
+      "school": "steel",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 150
+        }
+      ]
+    },
+    "crown_crush": {
+      "name": "Canopy Break",
+      "description": "A crushing blow and brief root.",
+      "icon": "Ⅱ",
+      "target": "enemy",
+      "range": 3200,
+      "cast": 10,
+      "cooldown": 60,
+      "cost": 10,
+      "gcd": 16,
+      "school": "steel",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 230
+        },
+        {
+          "kind": "root",
+          "duration": 20
+        }
+      ]
+    },
+    "crown_guard": {
+      "name": "Heartwood",
+      "description": "Restore health and gain a ward.",
+      "icon": "Ⅲ",
+      "target": "own",
+      "range": 0,
+      "cast": 0,
+      "cooldown": 140,
+      "cost": 12,
+      "gcd": 16,
+      "school": "thorn",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": 180
+        },
+        {
+          "kind": "shield",
+          "amount": 250,
+          "duration": 100
+        }
+      ]
+    },
+    "crown_hush": {
+      "name": "Sovereign Hush",
+      "description": "Longer reach and a 4-second school lock.",
+      "icon": "Ⅳ",
+      "target": "enemy",
+      "range": 5500,
+      "cast": 0,
+      "cooldown": 120,
+      "cost": 6,
+      "gcd": 1,
+      "school": "steel",
+      "effects": [
+        {
+          "kind": "interrupt",
+          "duration": 80
+        }
+      ]
+    },
+    "crown_bind": {
+      "name": "Wild Edict",
+      "description": "Reach out with roots and thorns.",
+      "icon": "Ⅴ",
+      "target": "enemy",
+      "range": 7000,
+      "cast": 0,
+      "cooldown": 100,
+      "cost": 10,
+      "gcd": 16,
+      "school": "thorn",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 100
+        },
+        {
+          "kind": "root",
+          "duration": 40
+        }
+      ]
+    },
+    "nova_bolt": {
+      "name": "Starthread",
+      "description": "A faster empowered ranged cast.",
+      "icon": "Ⅰ",
+      "target": "enemy",
+      "range": 14000,
+      "cast": 16,
+      "cooldown": 20,
+      "cost": 6,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 210
+        }
+      ]
+    },
+    "nova_spark": {
+      "name": "Flarelash",
+      "description": "Instant empowered flame.",
+      "icon": "Ⅱ",
+      "target": "enemy",
+      "range": 12000,
+      "cast": 0,
+      "cooldown": 50,
+      "cost": 10,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "damage",
+          "amount": 145
+        },
+        {
+          "kind": "slow",
+          "duration": 40
+        }
+      ]
+    },
+    "nova_veil": {
+      "name": "Solar Shroud",
+      "description": "Heal and absorb incoming damage.",
+      "icon": "Ⅲ",
+      "target": "own",
+      "range": 0,
+      "cast": 0,
+      "cooldown": 140,
+      "cost": 12,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": 140
+        },
+        {
+          "kind": "shield",
+          "amount": 260,
+          "duration": 100
+        }
+      ]
+    },
+    "nova_sever": {
+      "name": "Eclipse Thread",
+      "description": "Interrupt with a longer school lock.",
+      "icon": "Ⅳ",
+      "target": "enemy",
+      "range": 13000,
+      "cast": 0,
+      "cooldown": 120,
+      "cost": 6,
+      "gcd": 1,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "interrupt",
+          "duration": 80
+        }
+      ]
+    },
+    "nova_rain": {
+      "name": "Falling Sun",
+      "description": "An empowered area, visible only after its cast.",
+      "icon": "Ⅴ",
+      "target": "ground",
+      "range": 14000,
+      "cast": 20,
+      "cooldown": 120,
+      "cost": 18,
+      "gcd": 16,
+      "school": "ember",
+      "effects": [
+        {
+          "kind": "area",
+          "amount": 95,
+          "radius": 3200,
+          "duration": 80,
+          "interval": 20
+        }
+      ]
+    }
+  },
+  "arena": {
+    "half_x": 14000,
+    "half_z": 10000,
+    "obstacles": [
+      {
+        "pos": {
+          "x": 0,
+          "z": 4700
+        },
+        "radius": 1200
+      },
+      {
+        "pos": {
+          "x": 0,
+          "z": -4700
+        },
+        "radius": 1200
+      }
+    ],
+    "spawns": [
+      {
+        "x": -5500,
+        "z": 0
+      },
+      {
+        "x": 5500,
+        "z": 0
+      }
+    ]
+  }
+}
