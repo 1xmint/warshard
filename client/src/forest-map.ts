@@ -68,7 +68,7 @@ export class ForestMap {
     return root;
   }
   private async decorate(parent: TransformNode, arena: Arena) {
-    const names = ["tree_oak", "tree_pineTallA", "rock_largeA", "rock_largeB", "grass_large", "flower_purpleA", "tent_detailedOpen", "campfire_stones"];
+    const names = ["tree_oak", "tree_pineTallA", "rock_largeB", "grass_large", "flower_purpleA", "tent_detailedOpen", "campfire_stones"];
     const loaded = new Map<string, AssetContainer>();
     await Promise.all(names.map(async name => {
       if (!this.assets.has(name)) this.assets.set(name, LoadAssetContainerAsync(`/assets/kenney-nature/${name}.glb`, this.scene));
