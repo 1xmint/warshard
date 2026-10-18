@@ -37,6 +37,7 @@
         </div>
         <div class="resource"><div id="resource"></div></div>
         <small id="self-status"></small>
+        <span id="self-ignite" class="ignite-badge hidden"></span>
       </div>
     </section>
     <section class="unit-frame target hidden" id="target-frame">
@@ -49,6 +50,7 @@
           <span id="target-hp"></span>
         </div>
         <small id="target-status"></small>
+        <span id="target-ignite" class="ignite-badge hidden"></span>
         <div id="target-cast" class="target-cast hidden" role="progressbar" aria-label="Enemy cast" aria-valuemin="0" aria-valuemax="100">
           <div id="target-cast-progress"></div><span id="target-cast-label"></span>
         </div>
@@ -93,7 +95,7 @@
       <div class="hud-legend">
         <span><kbd>W A S D</kbd> Move</span
         ><span><kbd>Tab</kbd> Cycle target</span
-        ><span><kbd>1 – 5</kbd> Primary</span><span><kbd>Q E F C</kbd> Utilities</span><span><kbd>R</kbd> Ascend</span>
+        ><span><kbd>1 – 5</kbd> Primary</span><span><kbd>Q E F C</kbd> Utilities</span><span><kbd>R</kbd> Transform</span>
       </div>
     </footer>
     <div class="vignette"></div>
@@ -168,9 +170,12 @@
         moving. Stone pillars block movement and line of sight.
       </p>
       <p>
-        Build energy through combat. At 100%, press R for a 12-second
-        transformation. Arcanist's Spellstorm speeds up casts and helps build its critical chain;
-        other heroes gain alternate abilities. Shields absorb damage;
+        Build energy through combat. At 100%, press R to transform for 12 seconds.
+        Arcanists must target an enemy: Firestorm launches a huge fireball, then
+        grants an instant Sunshard. Firestorm's burn can build Kindling through
+        critical ticks, once per second across all targets. Spellstorm speeds up
+        casts during the transformation; other heroes keep their alternate
+        abilities. Shields absorb damage;
         interrupts cancel casts and briefly lock their school.
       </p>
       <p>

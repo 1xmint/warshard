@@ -726,7 +726,14 @@ export class ArenaRenderer {
         const carrying = latest.match_info.flags.some(
           (f) => f.carrier === p.id,
         );
-        const labelHtml = `<span class="team-tag">${badge}</span>${name} #${p.id}${p.bot ? " [BOT]" : p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%;background:${p.team === 0 ? "#6ad9bb" : "#e49b73"}"></i></span>${carrying ? '<b class="flag-carrier">⚑ FLAG CARRIER</b>' : ""}${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
+        const burnEnds = latest.burns
+          .filter((burn) => burn.target === p.id && burn.ability === "firestorm")
+          .reduce((ends, burn) => Math.max(ends, burn.ends), 0);
+        const igniteSeconds = Math.max(0, (burnEnds - latest.tick) / 20);
+        const ignite = igniteSeconds > 0
+          ? `<b style="display:block;color:#ffbb70;font-size:9px;text-shadow:0 0 8px #ff5a2c">IGNITE · ${igniteSeconds.toFixed(1)}s</b>`
+          : "";
+        const labelHtml = `<span class="team-tag">${badge}</span>${name} #${p.id}${p.bot ? " [BOT]" : p.id === localId ? " · YOU" : ""}<span class="mini-bar"><i style="width:${(p.health / p.max_health) * 100}%;background:${p.team === 0 ? "#6ad9bb" : "#e49b73"}"></i></span>${ignite}${carrying ? '<b class="flag-carrier">⚑ FLAG CARRIER</b>' : ""}${p.casting ? `<b>${this.content.abilities[p.casting.ability].name}</b>` : ""}`;
         if (actor.labelHtml !== labelHtml) {
           actor.label.innerHTML = labelHtml;
           actor.labelHtml = labelHtml;
