@@ -283,7 +283,8 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
             let ready = |slot| {
                 world.ability_id(id, slot).is_some_and(|ability| {
                     let definition = &world.content.abilities[ability];
-                    private.cooldowns.get(ability).copied().unwrap_or(0) <= world.tick
+                    (definition.off_gcd || private.gcd_until <= world.tick)
+                        && private.cooldowns.get(ability).copied().unwrap_or(0) <= world.tick
                         && private.resource >= definition.cost
                         && private
                             .lockouts
@@ -294,12 +295,15 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                         && (definition.charges <= 1 || world.charge_count(id, ability) > 0)
                 })
             };
-            if reaction_ready && ready(if arcanist { 5 } else { 3 }) {
-                cast_slot = Some(if arcanist { 5 } else { 3 });
+            if reaction_ready && ready(if arcanist { 7 } else { 3 }) {
+                cast_slot = Some(if arcanist { 7 } else { 3 });
                 action = "React to a visible cast";
-            } else if pressured && own.shield == 0 && ready(if arcanist { 6 } else { 2 }) {
-                cast_slot = Some(if arcanist { 6 } else { 2 });
+            } else if pressured && own.shield == 0 && ready(if arcanist { 5 } else { 2 }) {
+                cast_slot = Some(if arcanist { 5 } else { 2 });
                 action = "Barrier under pressure";
+            } else if arcanist && own.casting.is_none() && distance < 2700_i64.pow(2) && ready(8) {
+                cast_slot = Some(8);
+                action = "Glasswake peel / meteor setup";
             } else if arcanist && distance < 3500_i64.pow(2) && ready(4) {
                 // Turn away first, then use the same facing-based blink as the player.
                 let angle = f64::from(own.pos.x - enemy.pos.x)
@@ -315,8 +319,27 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                 memory.movement.2 = facing;
             } else if own.casting.is_none() && danger.is_none() {
                 if arcanist {
+                    let meteor_setup = goal == own.pos
+                        && ready(6)
+                        && (enemy.root_until > world.tick + 39
+                            || enemy
+                                .casting
+                                .as_ref()
+                                .is_some_and(|cast| cast.ends > world.tick + 39)
+                            || state
+                                .players
+                                .iter()
+                                .filter(|target| {
+                                    target.team != own.team
+                                        && target.health > 0
+                                        && target.pos.distance_sq(enemy.pos) <= 2700_i64.pow(2)
+                                })
+                                .count()
+                                >= 2);
                     cast_slot = Some(if private.chain.ready_until > world.tick {
                         3
+                    } else if meteor_setup {
+                        6
                     } else if private.chain.prepared_until > world.tick
                         && world.charge_count(id, "flashkindle") > 0
                     {
@@ -328,6 +351,8 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                     });
                     action = if private.chain.ready_until > world.tick {
                         "Spend instant Sunshard"
+                    } else if meteor_setup {
+                        "Crownfall on controlled / clustered enemies"
                     } else if private.chain.prepared_until > world.tick {
                         "Complete the critical chain"
                     } else if goal != own.pos {
@@ -353,11 +378,17 @@ fn trained(world: &mut World, id: u32, memory: &mut BotMemory) {
                     .find(|p| p.id == id)
                     .unwrap()
                     .casting
-                    .is_some()
+                    .as_ref()
+                    .is_some_and(|cast| !world.content.abilities[&cast.ability].cast_while_moving)
             {
                 goal = own.pos;
             }
-            if own.casting.is_some() && danger.is_none() && !(ranged && distance < 3500_i64.pow(2))
+            if own
+                .casting
+                .as_ref()
+                .is_some_and(|cast| !world.content.abilities[&cast.ability].cast_while_moving)
+                && danger.is_none()
+                && !(ranged && distance < 3500_i64.pow(2))
             {
                 goal = own.pos;
             }
